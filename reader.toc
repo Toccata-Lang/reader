@@ -467,12 +467,11 @@
                                                apply** (tag 'apply* file-name line-number)
                                                wrap* (tag 'wrap file-name line-number)
                                                list (tag 'list file-name line-number)]
-                                           ;; TODO: this needs to be a let expressio
                                            (ast/let-expr
-                                            (list (ast/binding-ast (symbol "#x" arg)))
+                                            (list (ast/binding-ast (symbol "#x") arg))
                                             (list (ast/call-expr
                                                    [apply**
-                                                    (ast/call-expr [wrap* (symbol "#x" arg) f])
+                                                    (ast/call-expr [wrap* (symbol "#x") f])
                                                     (ast/call-expr (list* list arg args))])))))
                                        read-sub-expr
                                        read-sub-expr
