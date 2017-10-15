@@ -36,7 +36,7 @@
 
 ;; we tag symbols with file/line for use later
 (defprotocol Tagged
-  (namespace [s])
+  (namespace [s] nothing)
   (tag [s file line] s)
   (untag [x] x))
 
