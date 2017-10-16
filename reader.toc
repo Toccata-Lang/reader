@@ -37,6 +37,7 @@
 ;; we tag symbols with file/line for use later
 (defprotocol Tagged
   (namespace [s] nothing)
+  (tag [s] (tag s "" 0))
   (tag [s file line] s)
   (untag [x] x))
 
@@ -67,11 +68,7 @@
   (namespace [s] nothing)
   (tag [s file line]
     (tagged-symbol nothing s s file line))
-  (untag [s] s)
-
-  Eq
-  (=* [s x]
-    (=* s (untag x))))
+  (untag [s] s))
 
 ;; It's useful to be able to tag lists of symbols
 (extend-type List
@@ -119,7 +116,8 @@
   (grmr/rule "tagged-symbol"
                (grmr/apply-fn (fn [file-name line-number ns start the-rest]
                                 (let [ns-prefix ((= "" ns) ns (str ns "/"))]
-                                  (tagged-symbol ns (symbol (to-str (cons start the-rest)))
+                                  (tagged-symbol ns
+                                                 (symbol (to-str (cons start the-rest)))
                                                  (symbol (to-str (comp (list ns-prefix start)
                                                                        the-rest)))
                                                  file-name line-number)))
