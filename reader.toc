@@ -11,7 +11,7 @@
 ;; The different types of nodes in the AST
 (add-ns ast (git-dependency "https://github.com/Toccata-Lang/ast.git"
                             "ast.toc"
-                            :sha "22fc8c6"))
+                            :sha "8aabae3"))
 
 
 (defn min [x y]
@@ -397,11 +397,11 @@
                             read-sub-expr
                             read-close-paren)))
 
-(def read-returns
-  (grmr/rule "returns"
-             (grmr/apply-fn ast/returns-expr
+(def read-assert-result
+  (grmr/rule "assert-result"
+             (grmr/apply-fn ast/result-expr
                             read-open-paren
-                            (grmr/ignore "returns")
+                            (grmr/ignore "assert-result")
                             (grmr/ignore (grmr/one-or-more whitespace))
                             read-symbol
                             (grmr/ignore (grmr/one-or-more whitespace))
@@ -482,7 +482,7 @@
   (grmr/rule "read-inline-body"
              (grmr/apply-fn comp
                             (grmr/none-or-more (grmr/any read-assert
-                                                         read-returns
+                                                         read-assert-result
                                                          read-block-comment))
                             ignore-whitespace
                             (grmr/all read-inline)
@@ -930,7 +930,7 @@
                                                 read-for
                                                 read-threading
                                                 read-assert
-                                                read-returns
+                                                read-assert-result
                                                 (grmr/all read-inline
                                                           (error "'inline' expressions not allowed here"))
                                                 read-call
