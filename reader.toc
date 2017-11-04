@@ -11,7 +11,7 @@
 ;; The different types of nodes in the AST
 (add-ns ast (git-dependency "https://github.com/Toccata-Lang/ast.git"
                             "ast.toc"
-                            :sha "8aabae3"))
+                            :sha "8bf7984"))
 
 
 (defn min [x y]
@@ -384,8 +384,21 @@
                             read-open-paren
                             (grmr/ignore "either")
                             (grmr/ignore (grmr/one-or-more whitespace))
+                            ;; TODO: make sure no literal values are here
                             read-sub-expr
                             read-sub-expr
+                            read-close-paren)))
+
+(def read-type-assertion
+  (grmr/rule "type-assertion"
+             (grmr/apply-fn ast/assert-type
+                            (grmr/any read-open-paren)
+                            (grmr/ignore (grmr/none-or-more whitespace))
+                            (grmr/ignore "instance?")
+                            (grmr/ignore (grmr/one-or-more whitespace))
+                            read-symbol
+                            (grmr/ignore (grmr/one-or-more whitespace))
+                            read-symbol
                             read-close-paren)))
 
 (def read-assert
@@ -405,7 +418,7 @@
                             (grmr/ignore (grmr/one-or-more whitespace))
                             read-symbol
                             (grmr/ignore (grmr/one-or-more whitespace))
-                            read-sub-expr
+                            read-type-assertion
                             read-close-paren)))
 
 (def read-comp
