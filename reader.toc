@@ -11,7 +11,7 @@
 ;; The different types of nodes in the AST
 (add-ns ast (git-dependency "https://github.com/Toccata-Lang/ast.git"
                             "ast.toc"
-                            :sha "8bf7984"))
+                            :sha "d1125f5"))
 
 
 (defn min [x y]
@@ -206,10 +206,11 @@
 
 (def read-integer
   (grmr/rule "number"
-             (grmr/any (grmr/apply-fn str-to-int
+             (grmr/any (grmr/apply-fn (fn [digits]
+                                        (str-to-int (to-str digits)))
                                       (grmr/one-or-more grmr/digit))
                        (grmr/apply-fn (fn [digits]
-                                        (* -1 (str-to-int digits)))
+                                        (* -1 (str-to-int (to-str digits))))
                                       (grmr/ignore "-")
                                       (grmr/one-or-more grmr/digit)))))
 
@@ -407,7 +408,7 @@
                             read-open-paren
                             (grmr/ignore "assert")
                             (grmr/ignore (grmr/one-or-more whitespace))
-                            read-sub-expr
+                            read-type-assertion
                             read-close-paren)))
 
 (def read-assert-result
