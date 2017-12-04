@@ -11,7 +11,7 @@
 ;; The different types of nodes in the AST
 (add-ns ast (git-dependency "https://github.com/Toccata-Lang/ast.git"
                             "ast.toc"
-                            :sha "d1125f5"))
+                            :sha "4f6b41b"))
 
 
 (defn min [x y]
@@ -48,6 +48,7 @@
 
   Tagged
   (namespace [s] ns)
+  (tag [s] s)
   (tag [s file line]
     (tagged-symbol ns base sym file line))
   (untag [_] base)
@@ -66,9 +67,20 @@
 (extend-type Symbol
   Tagged
   (namespace [s] nothing)
+  (tag [s]
+    (tagged-symbol nothing s s "" 0))
   (tag [s file line]
     (tagged-symbol nothing s s file line))
   (untag [s] s))
+
+(extend-type String
+  Tagged
+  (tag [s]
+    (let [s (symbol s)]
+      (tagged-symbol nothing s s "" 0)))
+  (tag [s file line]
+    (let [s (symbol s)]
+      (tagged-symbol nothing s s file line))))
 
 ;; It's useful to be able to tag lists of symbols
 (extend-type List
@@ -107,7 +119,7 @@
 (def read-namespace
   (grmr/rule "namespace"
                (grmr/apply-fn (fn [start the-rest]
-                                (symbol (to-str (cons start the-rest))))
+                                (symbol (to-str (comp [start] the-rest))))
                              grmr/alpha
                              rest-of-namespace
                              (grmr/ignore "/"))))
@@ -117,7 +129,7 @@
                (grmr/apply-fn (fn [file-name line-number ns start the-rest]
                                 (let [ns-prefix ((= "" ns) ns (str ns "/"))]
                                   (tagged-symbol ns
-                                                 (symbol (to-str (cons start the-rest)))
+                                                 (symbol (to-str (comp [start] the-rest)))
                                                  (symbol (to-str (comp (list ns-prefix start)
                                                                        the-rest)))
                                                  file-name line-number)))
@@ -280,7 +292,8 @@
                             (grmr/ignore "inline")
                             (grmr/ignore (grmr/one-or-more whitespace))
                             (grmr/apply-fn (fn [file-name line-number lang return-type body]
-                                             (ast/inline lang return-type body "" 0))
+                                             (ast/inline lang return-type body
+                                                         file-name line-number))
                                            (grmr/get-value 'file-name)
                                            (grmr/get-value 'line-number)
                                            read-symbol
@@ -354,7 +367,7 @@
 
 (def read-do
   (grmr/rule "do"
-             (grmr/apply-fn (partial ast/let-expr empty-list)
+             (grmr/apply-fn (partial ast/let-expr [])
                             read-open-paren
                             (grmr/ignore "do")
                             (grmr/ignore (grmr/one-or-more whitespace))
@@ -437,7 +450,8 @@
                                                comp** (tag 'comp* file-name line-number)
                                                list* (tag 'list file-name line-number)]
                                            (ast/call-expr [comp** arg
-                                                           (ast/call-expr (cons list* args))])))
+                                                           (ast/call-expr (cons list*
+                                                                                (seq args)))])))
                                        read-sub-expr
                                        (grmr/none-or-more read-sub-expr)
                                        (grmr/ignore (grmr/none-or-more whitespace))
@@ -458,7 +472,7 @@
                                                apply** (tag 'apply* file-name line-number)
                                                list (tag 'list file-name line-number)]
                                            (ast/call-expr [apply** f
-                                                           (ast/call-expr (cons list args))])))
+                                                           (ast/call-expr (cons list (seq args)))])))
                                        read-sub-expr
                                        (grmr/none-or-more read-sub-expr)
                                        (grmr/ignore (grmr/none-or-more whitespace))
@@ -473,18 +487,20 @@
                             (grmr/ignore "apply-to")
                             (grmr/ignore (grmr/one-or-more whitespace))
                             (grmr/any (grmr/apply-fn
-                                       (fn [f arg args]
+                                       (fn [fn ln f arg args]
                                          (let [file-name (ast/file-name f)
                                                line-number (ast/line-number f)
                                                apply** (tag 'apply* file-name line-number)
                                                wrap* (tag 'wrap file-name line-number)
                                                list (tag 'list file-name line-number)]
                                            (ast/let-expr
-                                            (list (ast/binding-ast (symbol "#x") arg))
-                                            (list (ast/call-expr
-                                                   [apply**
-                                                    (ast/call-expr [wrap* (symbol "#x") f])
-                                                    (ast/call-expr (list* list arg args))])))))
+                                            [(ast/binding-ast (tag "#x" fn ln) arg)]
+                                            [(ast/call-expr
+                                              [apply**
+                                               (ast/call-expr [wrap* (tag "#x" fn ln) f])
+                                               (ast/call-expr (list* list arg args))])])))
+                                       (grmr/get-value 'file-name)
+                                       (grmr/get-value 'line-number)
                                        read-sub-expr
                                        read-sub-expr
                                        (grmr/none-or-more read-sub-expr)
@@ -506,7 +522,7 @@
   (grmr/rule "fn-doc"
              (grmr/any read-block-comment
                        (grmr/apply-fn (fn [fn ln]
-                                        (ast/block-comment fn ln (list "")))
+                                        (ast/block-comment fn ln [""]))
                                       (grmr/get-value 'file-name)
                                       (grmr/get-value 'line-number)))))
 
@@ -564,6 +580,7 @@
                                       ignore-whitespace
                                       read-symbol
                                       (grmr/one-or-more read-implementation))
+                       read-assert
                        (grmr/apply-fn (fn [_] {})
                                       read-block-comment))))
 
@@ -598,7 +615,8 @@
              (grmr/apply-fn identity
                             (grmr/ignore "[")
                             (grmr/apply-fn (fn [fn ln elems]
-                                             (ast/call-expr (cons (tag 'vector fn ln) elems)))
+                                             (ast/call-expr (cons (tag 'vector fn ln)
+                                                                  (seq elems))))
                                            (grmr/get-value 'file-name)
                                            (grmr/get-value 'line-number)
                                            (grmr/none-or-more read-sub-expr)
@@ -644,10 +662,29 @@
                       :let [frms (rest quoted-list)]
                       contents (or (empty? frms)
                                    (maybe (map frms quote-literal)))]
-                  (ast/call-ast (tag 'vector (ast/file-name quoted-list) (ast/line-number quoted-list))
-                                contents)))
+                  (ast/call-ast (tag 'vector (ast/file-name quoted-list)
+                                     (ast/line-number quoted-list))
+                                (vec contents))))
             (ast/call-ast (tag 'list (ast/file-name quoted-list) (ast/line-number quoted-list))
-                          (map quoted-list quote-literal)))))
+                          (vec (map quoted-list quote-literal))))))
+
+(extend-type Vector
+  QuoteLiteral
+  (quote-literal [quoted-vect]
+    (either (or (for [head (first quoted-vect)
+                      :when (= head 'quoted)
+                      ast (quote-literal (rest quoted-vect))]
+                  ast)
+                (for [coll-builder (first quoted-vect)
+                      :when (or (= coll-builder 'hash-map)
+                                (= coll-builder 'vector))
+                      :let [frms (rest quoted-vect)]
+                      contents (or (empty? frms)
+                                   (maybe (map frms quote-literal)))]
+                  (ast/call-ast (tag 'vector (ast/file-name quoted-vect) (ast/line-number quoted-vect))
+                                contents)))
+            (ast/call-ast (tag 'list (ast/file-name quoted-vect) (ast/line-number quoted-vect))
+                          (map quoted-vect quote-literal)))))
 
 (def read-quoted-value
   (grmr/recursive-rule "quoted-value"
@@ -658,7 +695,8 @@
                                                                (grmr/none-or-more
                                                                 (grmr/recurse "quoted-value"))
                                                                read-close-paren)
-                                                (grmr/apply-fn (partial cons 'vector)
+                                                (grmr/apply-fn (fn [xs]
+                                                                 (cons 'vector (seq xs)))
                                                                (grmr/ignore "[")
                                                                (grmr/one-or-more
                                                                 (grmr/recurse "quoted-value"))
@@ -676,45 +714,39 @@
 
 (defprotocol ForBinding
   (nest-let [body bindings]
-    (ast/let-expr bindings (list body)))
+    (ast/let-expr bindings [body]))
 
   (nest-when [body clause wrapper]
     (let [fn (ast/file-name clause)
           ln (ast/line-number clause)]
       (ast/call-ast
        (tag 'extract fn ln)
-       (list (ast/or-expr
-              (list (ast/and-expr (list clause
-                                        (ast/call-ast (tag 'maybe fn ln) (list body))))
-                    (ast/call-ast
-                     (tag 'maybe fn ln)
-                     (list (ast/call-ast (tag 'zero fn ln)
-                                         (list (ast/call-ast (tag 'zero fn ln)
-                                                             (list wrapper))))))))))))
+       [(ast/or-expr
+         [(ast/and-expr [clause (ast/call-ast (tag 'maybe fn ln) [body])])
+          (ast/call-ast (tag 'maybe fn ln)
+                        [(ast/call-ast (tag 'zero fn ln)
+                                       [(ast/call-ast (tag 'zero fn ln)
+                                                      [wrapper])])])])])))
 
   (nest-when-not [body clause wrapper]
     (let [fn (ast/file-name clause)
           ln (ast/line-number clause)]
       (ast/call-ast
        (tag 'extract fn ln)
-       (list (ast/or-expr
-              (list (ast/and-expr
-                     (list clause (ast/call-ast
-                                   (tag 'maybe fn ln)
-                                   (list (ast/call-ast (tag 'zero fn ln)
-                                                       (list (ast/call-ast (tag 'zero fn ln)
-                                                                           (list wrapper))))))))
-                    (ast/call-ast
-                     (tag 'maybe fn ln)
-                     (list body))))))))
+       [(ast/or-expr
+         [(ast/and-expr
+                [clause (ast/call-ast (tag 'maybe fn ln)
+                                      [(ast/call-ast (tag 'zero fn ln)
+                                                     [(ast/call-ast (tag 'zero fn ln)
+                                                                    [wrapper])])])])
+          (ast/call-ast (tag 'maybe fn ln) [body])])])))
 
   (nest-binding [body binding wrapper]
     (ast/call-ast (tag 'flat-map (ast/file-name binding) (ast/line-number binding))
-                  (list (.val binding)
-                        (ast/fn-expr nothing
-                                     (list (ast/fn-arity (ast/params [(.binding binding)])
-                                                         ""
-                                                         (list body))))))))
+                  [(.val binding)
+                   (ast/fn-expr nothing
+                                [(ast/fn-arity (ast/params [(.binding binding)]) ""
+                                               [body])])])))
 
 (extend-type ast/binding-ast
   ForBinding
@@ -722,6 +754,8 @@
     (nest-binding body b wrapper)))
 
 (deftype ForLetExpr [bindings]
+  (assert (instance? Vector bindings))
+
   Stringable
   (string-list [_] (comp (list "<ForLet")
                          (string-list bindings)
@@ -794,60 +828,53 @@
           ln (ast/line-number clause)]
       (ast/call-ast
        (tag 'flat-map fn ln)
-       (list (ast/call-ast
-              (tag 'extract fn ln)
-              (list (ast/or-expr
-                     (list (ast/and-expr (list clause
-                                               (ast/call-ast
-                                                (tag 'maybe fn ln)
-                                                (list (ast/call-ast (tag 'wrap fn ln)
-                                                                    (list wrapper body))))))
-                           (ast/call-ast
-                            (tag 'maybe fn ln)
-                            (list (ast/call-ast (tag 'zero fn ln)
-                                                (list (ast/call-ast (tag 'zero fn ln)
-                                                                    (list wrapper))))))))))
-             (ast/fn-expr nothing
-                          (list (ast/fn-arity
-                                 (ast/params [(symbol "#x")])
-                                 ""
-                                 (list (ast/call-ast (tag 'wrap fn ln)
-                                                     (list wrapper (symbol "#x")))))))))))
+       [(ast/call-ast
+         (tag 'extract fn ln)
+         [(ast/or-expr
+           [(ast/and-expr [clause
+                                (ast/call-ast
+                                 (tag 'maybe fn ln)
+                                 [(ast/call-ast (tag 'wrap fn ln)
+                                                [wrapper body])])])
+            (ast/call-ast
+             (tag 'maybe fn ln)
+             [(ast/call-ast (tag 'zero fn ln)
+                            [(ast/call-ast (tag 'zero fn ln)
+                                           [wrapper])])])])])
+        (ast/fn-expr nothing
+                     [(ast/fn-arity (ast/params [(tag "#x" fn ln)]) ""
+                                    [(ast/call-ast (tag 'wrap fn ln)
+                                                   [wrapper (tag "#x" fn ln)])])])])))
 
   (nest-when-not [_ clause wrapper]
     (let [fn (ast/file-name clause)
           ln (ast/line-number clause)]
       (ast/call-ast
        (tag 'flat-map fn ln)
-       (list (ast/call-ast
-              (tag 'extract fn ln)
-              (list (ast/or-expr
-                     (list (ast/and-expr
-                            (list clause
-                                  (ast/call-ast
-                                   (tag 'maybe fn ln)
-                                   (list (ast/call-ast (tag 'zero fn ln) (list wrapper))))))
-                           (ast/call-ast
-                            (tag 'maybe fn ln)
-                            (list (ast/call-ast (tag 'wrap fn ln) (list wrapper body))))))))
-             (ast/fn-expr nothing
-                          (list (ast/fn-arity
-                                 (ast/params [(symbol "#x")])
-                                 ""
-                                 (list (ast/call-ast (tag 'wrap fn ln)
-                                                     (list wrapper (symbol "#x")))))))))))
+       [(ast/call-ast
+         (tag 'extract fn ln)
+         [(ast/or-expr
+           [(ast/and-expr [clause
+                                (ast/call-ast
+                                 (tag 'maybe fn ln)
+                                 [(ast/call-ast (tag 'zero fn ln) [wrapper])])])
+            (ast/call-ast
+             (tag 'maybe fn ln)
+             [(ast/call-ast (tag 'wrap fn ln) [wrapper body])])])])
+        (ast/fn-expr nothing
+                     [(ast/fn-arity (ast/params [(tag "#x" fn ln)]) ""
+                                    [(ast/call-ast (tag 'wrap fn ln)
+                                                   [wrapper (tag "#x" fn ln)])])])])))
 
   (nest-binding [_ binding wrapper]
     (let [fn (ast/file-name binding)
           ln (ast/line-number binding)]
       (ast/call-ast (tag 'flat-map fn ln)
-                    (list (.val binding)
-                          (ast/fn-expr nothing
-                                       (list (ast/fn-arity
-                                              (ast/params [(.binding binding)])
-                                              ""
-                                              (list (ast/call-ast (tag 'wrap fn ln)
-                                                                  (list wrapper body))))))))))
+                    [(.val binding)
+                     (ast/fn-expr nothing
+                                  [(ast/fn-arity (ast/params [(.binding binding)]) ""
+                                                 [(ast/call-ast (tag 'wrap fn ln)
+                                                                [wrapper body])])])])))
 
   Stringable
   (string-list [_] (comp (list "<ForResult ")
@@ -856,7 +883,7 @@
 
 ;; TODO: bogus
 (defn nest-for-exprs [bogus bindings body]
-  (let [wrapper (symbol "#wrapper")
+  (let [wrapper (tag "#wrapper")
         wrapper-binding (ForLetExpr [(ast/binding wrapper (.val bogus))])
         bindings (remove bindings (fn [bogus]
                                     (instance? ast/block-comment-ast bogus)))
@@ -898,7 +925,7 @@
 (defn nest-thread-exprs [first-expr exprs]
   (reduce exprs first-expr (fn [threaded expr]
                              (ast/call-ast (.call-target expr)
-                                           (cons threaded (.args expr))))))
+                                           (comp [threaded] (.args expr))))))
 
 (def read-thread-expr
   (grmr/rule "->exp"
@@ -1043,9 +1070,7 @@
                                                      (grmr/ignore
                                                       (grmr/one-or-more whitespace))
                                                      read-symbol
-                                                     (grmr/apply-fn comp*
-                                                                    read-proto-impls
-                                                                    (grmr/none-or-more read-proto-impls))
+                                                     (grmr/one-or-more read-proto-impls)
                                                      read-close-paren)
                                       (error "Invalid 'extend-type' expression")))))
 
@@ -1059,10 +1084,7 @@
                                                       (grmr/one-or-more whitespace))
                                                      read-symbol
                                                      read-params
-                                                     (grmr/any (grmr/apply-fn comp*
-                                                                              read-proto-impls
-                                                                              (grmr/none-or-more read-proto-impls))
-                                                               (grmr/always {}))
+                                                     (grmr/none-or-more read-proto-impls)
                                                      read-close-paren)
                                       (error "Invalid 'deftype' expression")))))
 
