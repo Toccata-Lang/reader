@@ -11,7 +11,7 @@
 ;; The different types of nodes in the AST
 (add-ns ast (git-dependency "https://github.com/Toccata-Lang/ast.git"
                             "ast.toc"
-                            :sha "4f6b41b"))
+                            :sha "5cb99a5"))
 
 
 (defn min [x y]
@@ -179,10 +179,11 @@
              (grmr/not-char "\n")))
 
 (defn string-frag-len [s]
+  (assert (instance? String s))
   (inline C Integer "
     char *str = NULL;
     int64_t strLen;
-    if (s_0->type == StringType) {
+    if (s_0->type == StringBufferType) {
       str = ((String *)s_0)->buffer;
       strLen = ((String *)s_0)->len;
     } else if (s_0->type == SubStringType) {
@@ -498,7 +499,7 @@
                                             [(ast/call-expr
                                               [apply**
                                                (ast/call-expr [wrap* (tag "#x" fn ln) f])
-                                               (ast/call-expr (list* list arg args))])])))
+                                               (ast/call-expr (list* list arg (seq args)))])])))
                                        (grmr/get-value 'file-name)
                                        (grmr/get-value 'line-number)
                                        read-sub-expr
@@ -539,10 +540,10 @@
 
 (def read-arities
   (grmr/rule "arities"
-             (grmr/any (grmr/apply-fn list read-single-arity)
+             (grmr/any (grmr/apply-fn vector read-single-arity)
                        (grmr/apply-fn (fn [doc arities]
-                                        (map arities (fn [arity]
-                                                       (assoc arity .doc doc))))
+                                        (vec (map arities (fn [arity]
+                                                            (.doc arity doc)))))
                                       read-fn-doc
                                       (grmr/one-or-more (grmr/apply-fn identity
                                                                        read-open-paren
@@ -635,7 +636,20 @@
                                            (grmr/none-or-more (grmr/all read-sub-expr
                                                                         read-sub-expr))
                                            (grmr/any (grmr/ignore "}")
-                                                     (error "Missing \"]\""))))))
+                                                     (error "Missing \"}\""))))))
+
+(def read-hash-set
+  (grmr/rule "hash-set"
+             (grmr/apply-fn identity
+                            (grmr/ignore "#{")
+                            (grmr/apply-fn (fn [fn ln elems]
+                                             (ast/call-expr (cons (tag 'hash-set fn ln)
+                                                                  (seq elems))))
+                                           (grmr/get-value 'file-name)
+                                           (grmr/get-value 'line-number)
+                                           (grmr/none-or-more read-sub-expr)
+                                           (grmr/any (grmr/ignore "}")
+                                                     (error "Missing \"}\""))))))
 
 (defprotocol QuoteLiteral
   (quote-literal [quoted]
@@ -968,6 +982,7 @@
                                                 read-reify
                                                 read-vector
                                                 read-hash-map
+                                                read-hash-set
                                                 read-for
                                                 read-threading
                                                 read-assert
