@@ -6,7 +6,7 @@
 ;; Components to build the grammar out of
 (add-ns grmr (git-dependency "https://github.com/Toccata-Lang/grammar.git"
                              "grammar.toc"
-                             :sha "1616a3a"))
+                             :sha "7690cd3"))
 
 ;; The different types of nodes in the AST
 (add-ns ast (git-dependency "https://github.com/Toccata-Lang/ast.git"
@@ -386,7 +386,12 @@
 
 (def read-and
   (grmr/rule "and"
-             (grmr/apply-fn ast/and-expr
+             (grmr/apply-fn (fn [clauses]
+                              (either (first clauses)
+                                      (do
+                                        (print-err 'WTF)
+                                        (abort)))
+                              (ast/and-expr clauses))
                             read-open-paren
                             (grmr/ignore "and")
                             (grmr/ignore (grmr/one-or-more whitespace))
