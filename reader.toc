@@ -265,19 +265,6 @@
                             (grmr/ignore "&")
                             read-arg)))
 
-(def read-params
-  (grmr/recursive-rule "params"
-                       (grmr/any (grmr/apply-fn identity
-                                                ignore-whitespace
-                                                (grmr/ignore "[")
-                                                (grmr/apply-fn ast/params
-                                                               (grmr/none-or-more
-                                                                (grmr/recurse "params"))
-                                                               (grmr/optional read-var-arg))
-                                                (grmr/any (grmr/ignore "]")
-                                                          (error "Missing ']'")))
-                                 read-arg)))
-
 (def read-open-paren
   (grmr/rule "open-paren"
              (grmr/ignore (grmr/all ignore-whitespace "(" ignore-whitespace))))
@@ -409,6 +396,18 @@
                             read-sub-expr
                             read-close-paren)))
 
+(def read-min-count-assertion
+  (grmr/rule "type-assertion"
+             (grmr/apply-fn ast/assert-min-count
+                            (grmr/any read-open-paren)
+                            (grmr/ignore (grmr/none-or-more whitespace))
+                            (grmr/ignore "min-count")
+                            (grmr/ignore (grmr/one-or-more whitespace))
+                            read-symbol
+                            (grmr/ignore (grmr/one-or-more whitespace))
+                            read-integer
+                            read-close-paren)))
+
 (def read-type-assertion
   (grmr/rule "type-assertion"
              (grmr/apply-fn ast/assert-type
@@ -427,7 +426,8 @@
                             read-open-paren
                             (grmr/ignore "assert")
                             (grmr/ignore (grmr/one-or-more whitespace))
-                            read-type-assertion
+                            (grmr/any read-type-assertion
+                                      read-min-count-assertion)
                             read-close-paren)))
 
 (def read-assert-result
@@ -536,7 +536,7 @@
   (grmr/rule "single-arity"
              (grmr/apply-fn (fn [params doc body]
                               (ast/fn-arity params doc body))
-                            read-params
+                            read-list-destructure
                             read-fn-doc
                             (grmr/any read-inline-body
                                       (grmr/one-or-more read-sub-expr)
@@ -1004,7 +1004,7 @@
                             read-open-paren
                             (grmr/ignore "main")
                             (grmr/any (grmr/apply-fn ast/main-fn
-                                                     read-params
+                                                     read-list-destructure
                                                      (grmr/any read-inline-body
                                                                (grmr/one-or-more read-expr)
                                                                (error "Body of 'main' fn is wrong"))
@@ -1042,7 +1042,7 @@
                                       (grmr/any
                                        (grmr/apply-fn ast/prototype
                                                       read-symbol
-                                                      read-params
+                                                      read-list-destructure
                                                       read-fn-doc
                                                       (grmr/any read-inline-body
                                                                 (grmr/none-or-more read-expr))
@@ -1103,7 +1103,7 @@
                                                      (grmr/ignore
                                                       (grmr/one-or-more whitespace))
                                                      read-symbol
-                                                     read-params
+                                                     read-list-destructure
                                                      (grmr/none-or-more read-proto-impls)
                                                      read-close-paren)
                                       (error "Invalid 'deftype' expression")))))
