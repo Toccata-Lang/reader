@@ -11,7 +11,7 @@
 ;; The different types of nodes in the AST
 (add-ns ast (git-dependency "https://github.com/Toccata-Lang/ast.git"
                             "ast.toc"
-                            :sha "5cb99a5"))
+                            :sha "a809247"))
 
 
 (defn min [x y]
@@ -22,7 +22,6 @@
 (defn debug [tag]
   (grmr/ignore
    (grmr/optional (grmr/term-fn (fn [text]
-                                  ;; Debugging a grammar
                                   (print-err tag (count text)
                                              (str "\"" (subs text 0 (min 40 (count text))) "\""))
                                   0)))))
@@ -147,32 +146,32 @@
 
 (def read-string-tab
   (grmr/rule "tab"
-             (grmr/apply-fn (fn [& _] "\t")
+               (grmr/apply-fn (fn [& _] "\t")
                             (grmr/all "\\" "t"))))
 
 (def read-string-backspace
   (grmr/rule "backspace"
-             (grmr/apply-fn (fn [& _] "\b")
+               (grmr/apply-fn (fn [& _] "\b")
                             (grmr/all "\\" "b"))))
 
 (def read-string-return
   (grmr/rule "return"
-             (grmr/apply-fn (fn [& _] "\r")
+               (grmr/apply-fn (fn [& _] "\r")
                             (grmr/all "\\" "r"))))
 
 (def read-string-formfeed
   (grmr/rule "formfeed"
-             (grmr/apply-fn (fn [& _] "\f")
+               (grmr/apply-fn (fn [& _] "\f")
                             (grmr/all "\\" "f"))))
 
 (def read-string-doublequote
   (grmr/rule "doublequote"
-             (grmr/apply-fn (fn [& _] "\"")
+               (grmr/apply-fn (fn [& _] "\"")
                             (grmr/all "\\" "\""))))
 
 (def read-string-backslash
   (grmr/rule "backslash"
-             (grmr/apply-fn (fn [& _] "\\")
+               (grmr/apply-fn (fn [& _] "\\")
                             (grmr/all "\\" "\\"))))
 
 (def not-eol
@@ -180,7 +179,6 @@
              (grmr/not-char "\n")))
 
 (defn string-frag-len [s]
-  ;; all chars except " and \
   (assert (instance? String s))
   (inline C Integer "
     char *str = NULL;
@@ -201,7 +199,8 @@
 
 (def read-string-fragment
   (grmr/rule "read-string-fragment"
-             (grmr/term-fn string-frag-len)))
+             (grmr/term-fn (fn [text]
+                             (string-frag-len text)))))
 
 (def read-string
   (grmr/rule "string"
@@ -398,7 +397,7 @@
                             read-close-paren)))
 
 (def read-min-count-assertion
-  (grmr/rule "min-count-assertion"
+  (grmr/rule "type-assertion"
              (grmr/apply-fn ast/assert-min-count
                             (grmr/any read-open-paren)
                             (grmr/ignore (grmr/none-or-more whitespace))
