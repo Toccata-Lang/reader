@@ -759,6 +759,19 @@
                                                                     [wrapper])])])])
           (ast/call-ast (tag 'maybe fn ln) [body])])])))
 
+  (nest-binding [body binding wrapper]))
+
+(extend-type ast/let-ast
+  ForBinding
+  (nest-binding [body binding wrapper]
+    (ast/call-ast (tag 'flat-map (ast/file-name binding) (ast/line-number binding))
+                  [(.val binding)
+                   (ast/fn-expr nothing
+                                [(ast/fn-arity (ast/params [(.binding binding)]) ""
+                                               [body])])])))
+
+(extend-type ast/call-ast
+  ForBinding
   (nest-binding [body binding wrapper]
     (ast/call-ast (tag 'flat-map (ast/file-name binding) (ast/line-number binding))
                   [(.val binding)
@@ -946,11 +959,12 @@
 
 (def read-thread-expr
   (grmr/rule "->exp"
-             (grmr/apply-fn identity
-                            (grmr/any (grmr/apply-fn ast/call-expr
-                                                     (grmr/all read-symbol))
-                                      read-call)
-                            ignore-whitespace)))
+             (grmr/any (grmr/apply-fn identity
+                                      (grmr/any (grmr/apply-fn ast/call-expr
+                                                               (grmr/all read-symbol))
+                                                read-call)
+                                      ignore-whitespace)
+                       (grmr/ignore read-block-comment))))
 
 (def read-threading
   (grmr/rule "->"
