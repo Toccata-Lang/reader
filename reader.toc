@@ -1174,6 +1174,10 @@
              (grmr/all ignore-whitespace "("
                        (error "Invalid expression"))))
 
+(def shebang (grmr/ignore (grmr/all "#!"
+                                    (grmr/none-or-more not-eol)
+                                    newline)))
+
 (def top-level
   (grmr/recursive-rule "top-level"
                        (grmr/any read-main
@@ -1185,8 +1189,5 @@
                                  read-deftype
                                  read-block-comment
                                  read-add-ns
+                                 shebang
                                  bad-expr)))
-
-(def shebang (grmr/ignore (grmr/all "#!"
-                                    (grmr/none-or-more not-eol)
-                                    newline)))
