@@ -6,12 +6,12 @@
 ;; Components to build the grammar out of
 (add-ns grmr (git-dependency "https://github.com/Toccata-Lang/grammar.git"
                              "grammar.toc"
-                             :sha "1653d24"))
+                             :sha "cb55c51"))
 
 ;; The different types of nodes in the AST
 (add-ns ast (git-dependency "https://github.com/Toccata-Lang/ast.git"
                             "ast.toc"
-                            :sha "41e5ca6"))
+                            :sha "f7b5678"))
 
 
 (defn min [x y]
@@ -42,6 +42,9 @@
   (untag [x] x))
 
 (deftype tagged-symbol [ns base sym file-name line-num]
+  (assert (instance? Maybe ns))
+  (assert (instance? Integer line-num))
+  
   ast/FileLineInfo
   (ast/file-name [s] file-name)
   (ast/line-number [s] line-num)
@@ -127,7 +130,8 @@
 (def read-symbol
   (grmr/rule "tagged-symbol"
                (grmr/apply-fn (fn [file-name line-number ns start the-rest]
-                                (let [ns-prefix ((= "" ns) ns (str ns "/"))]
+                                (let [ns-prefix (either (= "" ns)
+                                                        (str ns "/"))]
                                   (tagged-symbol ns
                                                  (symbol (to-str (comp [start] the-rest)))
                                                  (symbol (to-str (comp (list ns-prefix start)
@@ -364,7 +368,12 @@
 
 (def read-or
   (grmr/rule "or"
-             (grmr/apply-fn ast/or-expr
+             (grmr/apply-fn (fn [or-clauses]
+                              (either (first or-clauses)
+                                      (do
+                                        (print-err 'WTF)
+                                        (abort)))
+                              (ast/or-expr or-clauses))
                             read-open-paren
                             (grmr/ignore "or")
                             (grmr/ignore (grmr/one-or-more whitespace))
@@ -373,12 +382,12 @@
 
 (def read-and
   (grmr/rule "and"
-             (grmr/apply-fn (fn [clauses]
-                              (either (first clauses)
+             (grmr/apply-fn (fn [and-clauses]
+                              (either (first and-clauses)
                                       (do
                                         (print-err 'WTF)
                                         (abort)))
-                              (ast/and-expr clauses))
+                              (ast/and-expr and-clauses))
                             read-open-paren
                             (grmr/ignore "and")
                             (grmr/ignore (grmr/one-or-more whitespace))
@@ -463,27 +472,6 @@
                                        (grmr/ignore ")"))
                                       (error "Invalid 'comp' form")))))
 
-(def read-apply
-  (grmr/rule "apply"
-             (grmr/apply-fn identity
-                            (grmr/ignore "(")
-                            (grmr/ignore (grmr/none-or-more whitespace))
-                            (grmr/ignore "apply")
-                            (grmr/ignore (grmr/one-or-more whitespace))
-                            (grmr/any (grmr/apply-fn
-                                       (fn [f args]
-                                         (let [file-name (ast/file-name f)
-                                               line-number (ast/line-number f)
-                                               apply** (tag 'apply* file-name line-number)
-                                               list (tag 'list file-name line-number)]
-                                           (ast/call-expr [apply** f
-                                                           (ast/call-expr (cons list (seq args)))])))
-                                       read-sub-expr
-                                       (grmr/none-or-more read-sub-expr)
-                                       (grmr/ignore (grmr/none-or-more whitespace))
-                                       (grmr/ignore ")"))
-                                      (error "Invalid 'apply' form")))))
-
 (def read-apply-to
   (grmr/rule "apply-to"
              (grmr/apply-fn identity
@@ -495,13 +483,13 @@
                                        (fn [fn ln f arg args]
                                          (let [file-name (ast/file-name f)
                                                line-number (ast/line-number f)
-                                               apply** (tag 'apply* file-name line-number)
+                                               apply* (tag 'apply file-name line-number)
                                                wrap* (tag 'wrap file-name line-number)
                                                list (tag 'list file-name line-number)]
                                            (ast/let-expr
                                             [(ast/binding-ast (tag "#x" fn ln) arg)]
                                             [(ast/call-expr
-                                              [apply**
+                                              [apply*
                                                (ast/call-expr [wrap* (tag "#x" fn ln) f])
                                                (ast/call-expr (list* list arg (seq args)))])])))
                                        (grmr/get-value 'file-name)
@@ -993,7 +981,6 @@
                                                 read-let
                                                 read-do
                                                 read-comp
-                                                read-apply
                                                 read-apply-to
                                                 read-reify
                                                 read-vector
@@ -1199,3 +1186,7 @@
                                  read-block-comment
                                  read-add-ns
                                  bad-expr)))
+
+(def shebang (grmr/ignore (grmr/all "#!"
+                                    (grmr/none-or-more not-eol)
+                                    newline)))
