@@ -1174,9 +1174,12 @@
              (grmr/all ignore-whitespace "("
                        (error "Invalid expression"))))
 
-(def shebang (grmr/ignore (grmr/all "#!"
-                                    (grmr/none-or-more not-eol)
-                                    newline)))
+(def shebang (grmr/apply-fn (fn []
+                              ;; just a dummy ast that does nothing
+                              (ast/inline 'C nothing "" "" 0))
+                            (grmr/ignore (grmr/all "#!"
+                                                   (grmr/none-or-more not-eol)
+                                                   newline))))
 
 (def top-level
   (grmr/recursive-rule "top-level"
