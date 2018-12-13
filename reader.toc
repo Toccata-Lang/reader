@@ -11,7 +11,7 @@
 ;; The different types of nodes in the AST
 (add-ns ast (git-dependency "https://github.com/Toccata-Lang/ast.git"
                             "ast.toc"
-                            :sha "f7b5678"))
+                            :sha "862e62f"))
 
 
 (defn min [x y]
@@ -221,6 +221,24 @@
                                        read-string-newline))
                             (grmr/ignore "\""))))
 
+(def read-string-literal
+  (grmr/rule "string"
+             (grmr/apply-fn (fn [file-name line-num frags]
+                              (ast/string-ast (to-str frags) file-name line-num))
+                            (grmr/ignore "\"")
+                            (grmr/get-value 'file-name)
+                            (grmr/get-value 'line-number)
+                            (grmr/none-or-more
+                             (grmr/any read-string-fragment
+                                       read-string-backslash
+                                       read-string-doublequote
+                                       read-string-tab
+                                       read-string-backspace
+                                       read-string-return
+                                       read-string-formfeed
+                                       read-string-newline))
+                            (grmr/ignore "\""))))
+
 (def read-integer
   (grmr/rule "number"
              (grmr/any (grmr/apply-fn (fn [digits]
@@ -228,6 +246,22 @@
                                       (grmr/one-or-more grmr/digit))
                        (grmr/apply-fn (fn [digits]
                                         (* -1 (str-to-int (to-str digits))))
+                                      (grmr/ignore "-")
+                                      (grmr/one-or-more grmr/digit)))))
+
+(def read-integer-literal
+  (grmr/rule "number"
+             (grmr/any (grmr/apply-fn (fn [file-name line-num digits]
+                                        (ast/integer-ast (str-to-int (to-str digits))
+                                                         file-name line-num))
+                                      (grmr/get-value 'file-name)
+                                      (grmr/get-value 'line-number)
+                                      (grmr/one-or-more grmr/digit))
+                       (grmr/apply-fn (fn [file-name line-num digits]
+                                        (ast/integer-ast (* -1 (str-to-int (to-str digits)))
+                                                         file-name line-num))
+                                      (grmr/get-value 'file-name)
+                                      (grmr/get-value 'line-number)
                                       (grmr/ignore "-")
                                       (grmr/one-or-more grmr/digit)))))
 
@@ -284,8 +318,8 @@
                             (grmr/ignore "inline")
                             (grmr/ignore (grmr/one-or-more whitespace))
                             (grmr/apply-fn (fn [file-name line-number lang return-type body]
-                                             (ast/inline lang return-type body
-                                                         file-name line-number))
+                                             (ast/inline-ast lang return-type body
+                                                             file-name line-number))
                                            (grmr/get-value 'file-name)
                                            (grmr/get-value 'line-number)
                                            read-symbol
@@ -335,6 +369,7 @@
                        (grmr/any read-list-destructure
                                  read-arg)))
 (def read-let-binding
+  ;; TODO: accept comments as well
   (grmr/rule "let-binding"
              (grmr/apply-fn ast/binding
                             ignore-whitespace
@@ -401,12 +436,13 @@
                             (grmr/ignore "either")
                             (grmr/ignore (grmr/one-or-more whitespace))
                             ;; TODO: make sure no literal values are here
+                            ;; TODO: allow comments in either expr
                             read-sub-expr
                             read-sub-expr
                             read-close-paren)))
 
 (def read-min-count-assertion
-  (grmr/rule "type-assertion"
+  (grmr/rule "assert-min-count"
              (grmr/apply-fn ast/assert-min-count
                             (grmr/any read-open-paren)
                             (grmr/ignore (grmr/none-or-more whitespace))
@@ -417,8 +453,32 @@
                             read-integer
                             read-close-paren)))
 
+(def read-list-assertion
+  (grmr/rule "assert-type"
+             (grmr/apply-fn ast/assert-list-of
+                            (grmr/any read-open-paren)
+                            (grmr/ignore (grmr/none-or-more whitespace))
+                            (grmr/ignore "list-of")
+                            (grmr/ignore (grmr/one-or-more whitespace))
+                            read-symbol
+                            (grmr/ignore (grmr/one-or-more whitespace))
+                            read-symbol
+                            read-close-paren)))
+
+(def read-vector-assertion
+  (grmr/rule "assert-type"
+             (grmr/apply-fn ast/assert-vector-of
+                            (grmr/any read-open-paren)
+                            (grmr/ignore (grmr/none-or-more whitespace))
+                            (grmr/ignore "vector-of")
+                            (grmr/ignore (grmr/one-or-more whitespace))
+                            read-symbol
+                            (grmr/ignore (grmr/one-or-more whitespace))
+                            read-symbol
+                            read-close-paren)))
+
 (def read-type-assertion
-  (grmr/rule "type-assertion"
+  (grmr/rule "assert-type"
              (grmr/apply-fn ast/assert-type
                             (grmr/any read-open-paren)
                             (grmr/ignore (grmr/none-or-more whitespace))
@@ -428,15 +488,29 @@
                             (grmr/ignore (grmr/one-or-more whitespace))
                             read-symbol
                             read-close-paren)))
+(def read-max-val-assertion
+  (grmr/rule "assert-max"
+             (grmr/apply-fn ast/assert-max-value
+                            (grmr/any read-open-paren)
+                            (grmr/ignore (grmr/none-or-more whitespace))
+                            (grmr/ignore "max")
+                            (grmr/ignore (grmr/one-or-more whitespace))
+                            read-integer
+                            (grmr/ignore (grmr/one-or-more whitespace))
+                            read-symbol
+                            read-close-paren)))
 
 (def read-assert
   (grmr/rule "assert"
-             (grmr/apply-fn ast/assert-expr
+             (grmr/apply-fn identity
                             read-open-paren
                             (grmr/ignore "assert")
                             (grmr/ignore (grmr/one-or-more whitespace))
                             (grmr/any read-type-assertion
-                                      read-min-count-assertion)
+                                      read-vector-assertion
+                                      read-list-assertion
+                                      read-min-count-assertion
+                                      read-max-val-assertion)
                             read-close-paren)))
 
 (def read-assert-result
@@ -447,7 +521,10 @@
                             (grmr/ignore (grmr/one-or-more whitespace))
                             read-symbol
                             (grmr/ignore (grmr/one-or-more whitespace))
-                            read-type-assertion
+                            (grmr/any read-type-assertion
+                                      read-vector-assertion
+                                      read-list-assertion
+                                      read-max-val-assertion)
                             read-close-paren)))
 
 (def read-comp
@@ -591,10 +668,12 @@
 
 (def curr-file-name
   (grmr/rule "_FILE_"
-             (grmr/apply-fn identity
+             (grmr/apply-fn (fn [file-name line-num]
+                              (ast/string-ast file-name file-name line-num))
                             ignore-whitespace
                             (grmr/ignore "_FILE_")
-                            (grmr/get-value 'file-name))))
+                            (grmr/get-value 'file-name)
+                            (grmr/get-value 'line-number))))
 
 (def curr-line
 (grmr/rule "_LINE_"
@@ -646,6 +725,14 @@
 (defprotocol QuoteLiteral
   (quote-literal [quoted]
     (ast/quoted quoted)))
+
+(extend-type ast/string-ast
+  QuoteLiteral
+  (quote-literal [n] n))
+
+(extend-type ast/integer-ast
+  QuoteLiteral
+  (quote-literal [n] n))
 
 (extend-type String
   QuoteLiteral
@@ -707,8 +794,8 @@
                                                                (grmr/one-or-more
                                                                 (grmr/recurse "quoted-value"))
                                                                (grmr/ignore "]"))
-                                                read-integer
-                                                read-string
+                                                read-integer-literal
+                                                read-string-literal
                                                 read-symbol)
                                       ignore-whitespace)))
 
@@ -934,6 +1021,7 @@
                                                      (grmr/any (grmr/none-or-more read-for-binding)
                                                                (error "Invalid 'for' bindings"))
                                                      (grmr/ignore "]")
+                                                     ;; TODO: allow comments in body
                                                      (grmr/any read-sub-expr
                                                                (error "Invalid 'for' body")))
                                       (error "Invalid 'for' expression"))
@@ -958,6 +1046,7 @@
              (grmr/apply-fn identity
                             read-open-paren
                             (grmr/ignore "->")
+                            ;; TODO: allow comments in thread exprs
                             (grmr/any (grmr/apply-fn nest-thread-exprs
                                                      read-sub-expr
                                                      (grmr/one-or-more read-thread-expr))
@@ -968,8 +1057,8 @@
   (grmr/recursive-rule "expr"
                        (grmr/apply-fn identity
                                       ignore-whitespace
-                                      (grmr/any read-integer
-                                                read-string
+                                      (grmr/any read-integer-literal
+                                                read-string-literal
                                                 curr-file-name
                                                 curr-line
                                                 read-symbol
@@ -1055,7 +1144,7 @@
                             (grmr/ignore (grmr/one-or-more whitespace))
                             (grmr/any (grmr/apply-fn (fn [sym prototypes]
                                                        (ast/protocol
-                                                        sym (filter prototypes ast/not-assertion?)))
+                                                        sym (remove prototypes (partial instance? ast/NoCode))))
                                                      read-symbol
                                                      (grmr/one-or-more
                                                       (grmr/any read-block-comment
@@ -1176,7 +1265,7 @@
 
 (def shebang (grmr/apply-fn (fn []
                               ;; just a dummy ast that does nothing
-                              (ast/inline 'C nothing "" "" 0))
+                              (ast/inline-ast 'C nothing "" "" 0))
                             (grmr/ignore (grmr/all "#!"
                                                    (grmr/none-or-more not-eol)
                                                    newline))))
