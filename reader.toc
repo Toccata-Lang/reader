@@ -1193,7 +1193,20 @@
                                                      read-list-destructure
                                                      (grmr/none-or-more read-proto-impls)
                                                      read-close-paren)
-                                      (error "Invalid 'deftype' expression")))))
+                                      (error "invalid 'deftype' expression")))))
+
+(def read-JS-callable
+  (grmr/rule "JS-callable"
+             (grmr/apply-fn identity
+                            read-open-paren
+                            (grmr/ignore "JS-callable")
+                            (grmr/any (grmr/apply-fn (fn [sym]
+                                                       (ast/JS-callable sym))
+                                                     (grmr/ignore
+                                                      (grmr/one-or-more whitespace))
+                                                     read-symbol
+                                                     read-close-paren)
+                                      (error "invalid 'JS-callable' expression")))))
 
 (defn kw-string-arg [kw-sym]
   (grmr/apply-fn (fn [kw-sym value]
@@ -1273,6 +1286,7 @@
 (def top-level
   (grmr/recursive-rule "top-level"
                        (grmr/any read-main
+                                 read-JS-callable
                                  read-inline
                                  read-def
                                  read-defprotocol
