@@ -1062,9 +1062,11 @@
                             read-close-paren)))
 
 (defn nest-thread-exprs [first-expr exprs]
-  (reduce exprs first-expr (fn [threaded expr]
-                             (ast/call-ast (.call-target expr)
-                                           (comp [threaded] (.args expr))))))
+  (let [[first-expr & exprs] (remove (cons first-expr (seq exprs))
+                                     (partial instance? ast/NoCode))]
+    (reduce exprs first-expr (fn [threaded expr]
+                               (ast/call-ast (.call-target expr)
+                                             (comp [threaded] (.args expr)))))))
 
 (def read-thread-expr
   (grmr/rule "->exp"
@@ -1073,14 +1075,13 @@
                                                                (grmr/all read-symbol))
                                                 read-call)
                                       ignore-whitespace)
-                       (grmr/ignore read-block-comment))))
+                       read-block-comment)))
 
 (def read-threading
   (grmr/rule "->"
              (grmr/apply-fn identity
                             read-open-paren
                             (grmr/ignore "->")
-                            ;; TODO: allow comments in thread exprs
                             (grmr/any (grmr/apply-fn nest-thread-exprs
                                                      read-sub-expr
                                                      (grmr/one-or-more read-thread-expr))
