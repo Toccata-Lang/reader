@@ -344,6 +344,9 @@
                                                            (grmr/none-or-more not-eol))
                                             (grmr/ignore newline))))))
 
+(def ignore-comment
+  (grmr/ignore read-block-comment))
+
 (def read-call
   (grmr/rule "call"
              (grmr/apply-fn ast/call-expr
@@ -500,6 +503,18 @@
                             read-symbol
                             read-close-paren)))
 
+(def read-min-val-assertion
+  (grmr/rule "assert-min"
+             (grmr/apply-fn ast/assert-min-value
+                            (grmr/any read-open-paren)
+                            (grmr/ignore (grmr/none-or-more whitespace))
+                            (grmr/ignore "min")
+                            (grmr/ignore (grmr/one-or-more whitespace))
+                            read-integer
+                            (grmr/ignore (grmr/one-or-more whitespace))
+                            read-symbol
+                            read-close-paren)))
+
 (def read-assert
   (grmr/rule "assert"
              (grmr/apply-fn identity
@@ -510,6 +525,7 @@
                                       read-vector-assertion
                                       read-list-assertion
                                       read-min-count-assertion
+                                      read-min-val-assertion
                                       read-max-val-assertion)
                             read-close-paren)))
 
@@ -524,6 +540,7 @@
                             (grmr/any read-type-assertion
                                       read-vector-assertion
                                       read-list-assertion
+                                      read-min-val-assertion
                                       read-max-val-assertion)
                             read-close-paren)))
 
@@ -636,11 +653,28 @@
 (def TypeCount (inline C Integer "(Value *)&(Integer){IntegerType, -1, TypeCount};"))
 (def type-counter (int-generator TypeCount))
 
+(def read-impl-arity
+  (grmr/rule "impl-arity"
+             (grmr/apply-fn (fn [params doc body]
+                              (ast/fn-arity params doc body))
+                            (grmr/apply-fn ast/params
+                                           ignore-whitespace
+                                           (grmr/ignore "[")
+                                           (grmr/one-or-more read-sub-dest)
+                                           (grmr/any (grmr/apply-fn maybe read-var-arg)
+                                                     (grmr/always nothing))
+                                           (grmr/ignore "]"))
+                            read-fn-doc
+                            (grmr/any read-inline-body
+                                      (grmr/one-or-more read-sub-expr)
+                                      (error "Body of function is wrong"))
+                            ignore-whitespace)))
+
 (def read-implementation
   (grmr/rule "protocol-implementation"
              (grmr/all read-open-paren
                        read-symbol
-                       (grmr/apply-fn list read-single-arity)
+                       (grmr/apply-fn list read-impl-arity)
                        read-close-paren)))
 
 
@@ -875,7 +909,7 @@
              (grmr/apply-fn (fn [bindings]
                               (ForLetExpr bindings))
                             (grmr/any ignore-whitespace
-                                      (grmr/ignore read-block-comment))
+                                      ignore-comment)
                             (grmr/ignore ":let")
                             (grmr/ignore (grmr/one-or-more whitespace))
                             (grmr/ignore "[")
@@ -898,7 +932,7 @@
              (grmr/apply-fn (fn [clause]
                               (ForWhenExpr clause))
                             (grmr/any ignore-whitespace
-                                      (grmr/ignore read-block-comment))
+                                      ignore-comment)
                             (grmr/ignore ":when")
                             (grmr/ignore (grmr/one-or-more whitespace))
                             read-sub-expr)))
@@ -918,7 +952,7 @@
              (grmr/apply-fn (fn [clause]
                               (ForWhenNotExpr clause))
                             (grmr/any ignore-whitespace
-                                      (grmr/ignore read-block-comment))
+                                      ignore-comment)
                             (grmr/ignore ":when-not")
                             (grmr/ignore (grmr/one-or-more whitespace))
                             read-sub-expr)))
@@ -1200,11 +1234,14 @@
              (grmr/apply-fn identity
                             read-open-paren
                             (grmr/ignore "JS-callable")
-                            (grmr/any (grmr/apply-fn (fn [sym]
-                                                       (ast/JS-callable sym))
+                            (grmr/any (grmr/apply-fn (fn [sym num-args]
+                                                       (ast/JS-callable sym num-args))
                                                      (grmr/ignore
                                                       (grmr/one-or-more whitespace))
                                                      read-symbol
+                                                     (grmr/ignore
+                                                      (grmr/one-or-more whitespace))
+                                                     read-integer
                                                      read-close-paren)
                                       (error "invalid 'JS-callable' expression")))))
 
