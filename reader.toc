@@ -448,7 +448,7 @@
   (grmr/rule "assert-min-count"
              (grmr/apply-fn ast/assert-min-count
                             (grmr/any read-open-paren)
-                            (grmr/ignore (grmr/none-or-more whitespace))
+                            ignore-whitespace
                             (grmr/ignore "min-count")
                             (grmr/ignore (grmr/one-or-more whitespace))
                             read-symbol
@@ -507,7 +507,7 @@
   (grmr/rule "assert-min"
              (grmr/apply-fn ast/assert-min-value
                             (grmr/any read-open-paren)
-                            (grmr/ignore (grmr/none-or-more whitespace))
+                            ignore-whitespace
                             (grmr/ignore "min")
                             (grmr/ignore (grmr/one-or-more whitespace))
                             read-integer
@@ -544,7 +544,7 @@
   (grmr/rule "comp"
              (grmr/apply-fn identity
                             (grmr/ignore "(")
-                            (grmr/ignore (grmr/none-or-more whitespace))
+                            ignore-whitespace
                             (grmr/ignore "comp")
                             (grmr/ignore (grmr/one-or-more whitespace))
                             (grmr/any (grmr/apply-fn
@@ -558,7 +558,7 @@
                                                                                 (seq args)))])))
                                        read-sub-expr
                                        (grmr/none-or-more read-sub-expr)
-                                       (grmr/ignore (grmr/none-or-more whitespace))
+                                       ignore-whitespace
                                        (grmr/ignore ")"))
                                       (error "Invalid 'comp' form")))))
 
@@ -566,7 +566,7 @@
   (grmr/rule "apply-to"
              (grmr/apply-fn identity
                             (grmr/ignore "(")
-                            (grmr/ignore (grmr/none-or-more whitespace))
+                            ignore-whitespace
                             (grmr/ignore "apply-to")
                             (grmr/ignore (grmr/one-or-more whitespace))
                             (grmr/any (grmr/apply-fn
@@ -587,7 +587,7 @@
                                        read-sub-expr
                                        read-sub-expr
                                        (grmr/none-or-more read-sub-expr)
-                                       (grmr/ignore (grmr/none-or-more whitespace))
+                                       ignore-whitespace
                                        (grmr/ignore ")"))
                                       (error "Invalid 'apply-to' form")))))
 
