@@ -457,19 +457,17 @@
                             read-close-paren)))
 
 (def read-list-assertion
-  (grmr/rule "assert-type"
+  (grmr/rule "assert-list-of"
              (grmr/apply-fn ast/assert-list-of
                             (grmr/any read-open-paren)
                             (grmr/ignore (grmr/none-or-more whitespace))
                             (grmr/ignore "list-of")
                             (grmr/ignore (grmr/one-or-more whitespace))
                             read-symbol
-                            (grmr/ignore (grmr/one-or-more whitespace))
-                            read-symbol
                             read-close-paren)))
 
 (def read-vector-assertion
-  (grmr/rule "assert-type"
+  (grmr/rule "assert-vector-of"
              (grmr/apply-fn ast/assert-vector-of
                             (grmr/any read-open-paren)
                             (grmr/ignore (grmr/none-or-more whitespace))
@@ -487,7 +485,9 @@
                             (grmr/ignore (grmr/none-or-more whitespace))
                             (grmr/ignore "instance?")
                             (grmr/ignore (grmr/one-or-more whitespace))
-                            read-symbol
+                            (grmr/any read-symbol
+                                      read-vector-assertion
+                                      read-list-assertion)
                             (grmr/ignore (grmr/one-or-more whitespace))
                             read-symbol
                             read-close-paren)))
@@ -522,8 +522,6 @@
                             (grmr/ignore "assert")
                             (grmr/ignore (grmr/one-or-more whitespace))
                             (grmr/any read-type-assertion
-                                      read-vector-assertion
-                                      read-list-assertion
                                       read-min-count-assertion
                                       read-min-val-assertion
                                       read-max-val-assertion)
@@ -538,8 +536,6 @@
                             read-symbol
                             (grmr/ignore (grmr/one-or-more whitespace))
                             (grmr/any read-type-assertion
-                                      read-vector-assertion
-                                      read-list-assertion
                                       read-min-val-assertion
                                       read-max-val-assertion)
                             read-close-paren)))
