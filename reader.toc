@@ -447,7 +447,7 @@
 (def read-min-count-assertion
   (grmr/rule "assert-min-count"
              (grmr/apply-fn ast/assert-min-count
-                            (grmr/any read-open-paren)
+                            read-open-paren
                             ignore-whitespace
                             (grmr/ignore "min-count")
                             (grmr/ignore (grmr/one-or-more whitespace))
@@ -456,46 +456,75 @@
                             read-integer
                             read-close-paren)))
 
+(def read-sub-type-expr
+  (grmr/recurse "type-expr"))
+
 (def read-list-assertion
   (grmr/rule "assert-list-of"
              (grmr/apply-fn ast/assert-list-of
-                            (grmr/any read-open-paren)
-                            (grmr/ignore (grmr/none-or-more whitespace))
+                            read-open-paren
+                            ignore-whitespace
                             (grmr/ignore "list-of")
                             (grmr/ignore (grmr/one-or-more whitespace))
-                            read-symbol
+                            read-sub-type-expr
+                            read-close-paren)))
+
+(def read-maybe-assertion
+  (grmr/rule "assert-maybe-of"
+             (grmr/apply-fn ast/assert-maybe-of
+                            read-open-paren
+                            ignore-whitespace
+                            (grmr/ignore "maybe-of")
+                            (grmr/ignore (grmr/one-or-more whitespace))
+                            read-sub-type-expr
                             read-close-paren)))
 
 (def read-vector-assertion
   (grmr/rule "assert-vector-of"
              (grmr/apply-fn ast/assert-vector-of
-                            (grmr/any read-open-paren)
-                            (grmr/ignore (grmr/none-or-more whitespace))
+                            read-open-paren
+                            ignore-whitespace
                             (grmr/ignore "vector-of")
                             (grmr/ignore (grmr/one-or-more whitespace))
-                            read-symbol
-                            (grmr/ignore (grmr/one-or-more whitespace))
-                            read-symbol
+                            read-sub-type-expr
                             read-close-paren)))
+
+(def read-map-assertion
+  (grmr/rule "assert-map-of"
+             (grmr/apply-fn ast/assert-map-of
+                            read-open-paren
+                            ignore-whitespace
+                            (grmr/ignore "map-of")
+                            (grmr/ignore (grmr/one-or-more whitespace))
+                            read-sub-type-expr
+                            (grmr/ignore (grmr/one-or-more whitespace))
+                            read-sub-type-expr
+                            read-close-paren)))
+
+(def read-type-expr
+  (grmr/recursive-rule "type-expr"
+                       (grmr/any read-symbol
+                                 read-maybe-assertion
+                                 read-map-assertion
+                                 read-vector-assertion
+                                 read-list-assertion)))
 
 (def read-type-assertion
   (grmr/rule "assert-type"
              (grmr/apply-fn ast/assert-type
-                            (grmr/any read-open-paren)
-                            (grmr/ignore (grmr/none-or-more whitespace))
+                            read-open-paren
+                            ignore-whitespace
                             (grmr/ignore "instance?")
                             (grmr/ignore (grmr/one-or-more whitespace))
-                            (grmr/any read-symbol
-                                      read-vector-assertion
-                                      read-list-assertion)
+                            read-type-expr
                             (grmr/ignore (grmr/one-or-more whitespace))
                             read-symbol
                             read-close-paren)))
 (def read-max-val-assertion
   (grmr/rule "assert-max"
              (grmr/apply-fn ast/assert-max-value
-                            (grmr/any read-open-paren)
-                            (grmr/ignore (grmr/none-or-more whitespace))
+                            read-open-paren
+                            ignore-whitespace
                             (grmr/ignore "max")
                             (grmr/ignore (grmr/one-or-more whitespace))
                             read-integer
@@ -506,7 +535,7 @@
 (def read-min-val-assertion
   (grmr/rule "assert-min"
              (grmr/apply-fn ast/assert-min-value
-                            (grmr/any read-open-paren)
+                            read-open-paren
                             ignore-whitespace
                             (grmr/ignore "min")
                             (grmr/ignore (grmr/one-or-more whitespace))
