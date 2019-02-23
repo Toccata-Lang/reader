@@ -6,12 +6,12 @@
 ;; Components to build the grammar out of
 (add-ns grmr (git-dependency "https://github.com/Toccata-Lang/grammar.git"
                              "grammar.toc"
-                             :sha "cb55c51"))
+                             :sha "1e280ff"))
 
 ;; The different types of nodes in the AST
 (add-ns ast (git-dependency "https://github.com/Toccata-Lang/ast.git"
                             "ast.toc"
-                            :sha "862e62f"))
+                            :sha "b667c1b"))
 
 
 (defn min [x y]
