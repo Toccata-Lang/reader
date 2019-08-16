@@ -130,8 +130,9 @@
 (def read-symbol
   (grmr/rule "tagged-symbol"
                (grmr/apply-fn (fn [file-name line-number ns start the-rest]
-                                (let [ns-prefix (either (= "" ns)
-                                                        (str ns "/"))]
+                                (let [ns-prefix (either (map ns (fn [ns]
+                                                                  (str ns "/")))
+                                                        "")]
                                   (tagged-symbol ns
                                                  (symbol (to-str (comp [start] the-rest)))
                                                  (symbol (to-str (comp (list ns-prefix start)
@@ -459,6 +460,16 @@
 (def read-sub-type-expr
   (grmr/recurse "type-expr"))
 
+(def read-vector-assertion
+  (grmr/rule "assert-vector-of"
+             (grmr/apply-fn ast/assert-vector-of
+                            read-open-paren
+                            ignore-whitespace
+                            (grmr/ignore "vector-of")
+                            (grmr/ignore (grmr/one-or-more whitespace))
+                            read-sub-type-expr
+                            read-close-paren)))
+
 (def read-list-assertion
   (grmr/rule "assert-list-of"
              (grmr/apply-fn ast/assert-list-of
@@ -475,16 +486,6 @@
                             read-open-paren
                             ignore-whitespace
                             (grmr/ignore "maybe-of")
-                            (grmr/ignore (grmr/one-or-more whitespace))
-                            read-sub-type-expr
-                            read-close-paren)))
-
-(def read-vector-assertion
-  (grmr/rule "assert-vector-of"
-             (grmr/apply-fn ast/assert-vector-of
-                            read-open-paren
-                            ignore-whitespace
-                            (grmr/ignore "vector-of")
                             (grmr/ignore (grmr/one-or-more whitespace))
                             read-sub-type-expr
                             read-close-paren)))
