@@ -64,6 +64,9 @@
   Hashable
   (sha1 [_] (sha1 base))
 
+  Ord
+  (<* [_ x] (<* x base))
+
   Eq
   (=* [_ x] (=* x base)))
 
@@ -521,6 +524,7 @@
                             (grmr/ignore (grmr/one-or-more whitespace))
                             read-symbol
                             read-close-paren)))
+
 (def read-max-val-assertion
   (grmr/rule "assert-max"
              (grmr/apply-fn ast/assert-max-value
@@ -698,10 +702,11 @@
 
 (def read-implementation
   (grmr/rule "protocol-implementation"
-             (grmr/all read-open-paren
-                       read-symbol
-                       (grmr/apply-fn list read-impl-arity)
-                       read-close-paren)))
+             (grmr/apply-fn hash-map
+                            read-open-paren
+                            read-symbol
+                            (grmr/apply-fn vector read-impl-arity)
+                            read-close-paren)))
 
 
 (def read-proto-impls
@@ -709,7 +714,9 @@
              (grmr/any (grmr/apply-fn hash-map
                                       ignore-whitespace
                                       read-symbol
-                                      (grmr/one-or-more read-implementation))
+                                      (grmr/apply-fn (fn [impl-fns]
+                                                       (apply merge-with (cons comp (seq impl-fns))))
+                                                     (grmr/one-or-more read-implementation)))
                        read-assert
                        (grmr/apply-fn (fn [_] {})
                                       read-block-comment))))
@@ -721,9 +728,9 @@
                             read-open-paren
                             (grmr/ignore "reify")
                             (grmr/ignore (grmr/one-or-more whitespace))
-                            (grmr/apply-fn comp*
-                                           read-proto-impls
-                                           (grmr/none-or-more read-proto-impls))
+                            (grmr/apply-fn (fn [proto-impls]
+                                             (apply merge-with (cons comp (seq proto-impls))))
+                                           (grmr/one-or-more read-proto-impls))
                             read-close-paren)))
 
 (def curr-file-name
