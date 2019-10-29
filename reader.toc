@@ -6,7 +6,7 @@
 ;; Components to build the grammar out of
 (add-ns grmr (git-dependency "https://github.com/Toccata-Lang/grammar.git"
                              "grammar.toc"
-                             :sha "964a824"))
+                             :sha "5a3a870"))
 
 ;; The different types of nodes in the AST
 (add-ns ast (git-dependency "https://github.com/Toccata-Lang/ast.git"
@@ -25,14 +25,6 @@
                                   (print-err tag (count text)
                                              (str "\"" (subs text 0 (min 40 (count text))) "\""))
                                   0)))))
-
-(defn error [msg]
-  (grmr/apply-fn (fn [file line]
-                   (print-err msg "at" file line)
-                   (abort))
-                 (grmr/get-value 'file-name)
-                 (grmr/get-value 'line-number)))
-
 
 ;; we tag symbols with file/line for use later
 (defprotocol Tagged
@@ -397,7 +389,7 @@
                                                      (grmr/ignore "]")
                                                      (grmr/one-or-more read-sub-expr)
                                                      read-close-paren)
-                                      (error "Invalid 'let' expression")))))
+                                      (grmr/error "Invalid 'let' expression")))))
 
 (def read-do
   (grmr/rule "do"
@@ -594,7 +586,7 @@
                                        (grmr/none-or-more read-sub-expr)
                                        ignore-whitespace
                                        (grmr/ignore ")"))
-                                      (error "Invalid 'comp' form")))))
+                                      (grmr/error "Invalid 'comp' form")))))
 
 (def read-apply-to
   (grmr/rule "apply-to"
@@ -623,7 +615,7 @@
                                        (grmr/none-or-more read-sub-expr)
                                        ignore-whitespace
                                        (grmr/ignore ")"))
-                                      (error "Invalid 'apply-to' form")))))
+                                      (grmr/error "Invalid 'apply-to' form")))))
 
 (def read-inline-body
   (grmr/rule "read-inline-body"
@@ -651,7 +643,7 @@
                             read-fn-doc
                             (grmr/any read-inline-body
                                       (grmr/one-or-more read-sub-expr)
-                                      (error "Body of function is wrong"))
+                                      (grmr/error "Body of function is wrong"))
                             ignore-whitespace)))
 
 (def read-arities
@@ -678,7 +670,7 @@
                                                      ignore-whitespace
                                                      read-arities
                                                      read-close-paren)
-                                      (error "Invalid 'fn' expression")))))
+                                      (grmr/error "Invalid 'fn' expression")))))
 
 (def TypeCount (inline C Integer "(Value *)&(Integer){IntegerType, -1, TypeCount};"))
 (def type-counter (int-generator TypeCount))
@@ -697,7 +689,7 @@
                             read-fn-doc
                             (grmr/any read-inline-body
                                       (grmr/one-or-more read-sub-expr)
-                                      (error "Body of function is wrong"))
+                                      (grmr/error "Body of function is wrong"))
                             ignore-whitespace)))
 
 (def read-implementation
@@ -760,7 +752,7 @@
                                            (grmr/get-value 'line-number)
                                            (grmr/none-or-more read-sub-expr)
                                            (grmr/any (grmr/ignore "]")
-                                                     (error "Missing \"]\""))))))
+                                                     (grmr/error "Missing \"]\""))))))
 
 (def read-hash-map
   (grmr/rule "hash-map"
@@ -774,7 +766,7 @@
                                            (grmr/none-or-more (grmr/all read-sub-expr
                                                                         read-sub-expr))
                                            (grmr/any (grmr/ignore "}")
-                                                     (error "Missing \"}\""))))))
+                                                     (grmr/error "Missing \"}\""))))))
 
 (def read-hash-set
   (grmr/rule "hash-set"
@@ -787,7 +779,7 @@
                                            (grmr/get-value 'line-number)
                                            (grmr/none-or-more read-sub-expr)
                                            (grmr/any (grmr/ignore "}")
-                                                     (error "Missing \"}\""))))))
+                                                     (grmr/error "Missing \"}\""))))))
 
 (defprotocol QuoteLiteral
   (quote-literal [quoted]
@@ -1085,14 +1077,14 @@
                             (grmr/any (grmr/apply-fn nest-for-exprs
                                                      (grmr/ignore "[")
                                                      (grmr/any read-let-binding
-                                                               (error "Invalid initial 'for' bindings"))
+                                                               (grmr/error "Invalid initial 'for' bindings"))
                                                      (grmr/any (grmr/none-or-more read-for-binding)
-                                                               (error "Invalid 'for' bindings"))
+                                                               (grmr/error "Invalid 'for' bindings"))
                                                      (grmr/ignore "]")
                                                      ;; TODO: allow comments in body
                                                      (grmr/any read-sub-expr
-                                                               (error "Invalid 'for' body")))
-                                      (error "Invalid 'for' expression"))
+                                                               (grmr/error "Invalid 'for' body")))
+                                      (grmr/error "Invalid 'for' expression"))
                             read-close-paren)))
 
 (defn nest-thread-exprs [first-expr exprs]
@@ -1119,7 +1111,7 @@
                             (grmr/any (grmr/apply-fn nest-thread-exprs
                                                      read-sub-expr
                                                      (grmr/one-or-more read-thread-expr))
-                                      (error "Invalid '->' expression"))
+                                      (grmr/error "Invalid '->' expression"))
                             read-close-paren)))
 
 (def read-expr
@@ -1149,7 +1141,7 @@
                                                 read-assert
                                                 read-assert-result
                                                 (grmr/all read-inline
-                                                          (error "'inline' expressions not allowed here"))
+                                                          (grmr/error "'inline' expressions not allowed here"))
                                                 read-call
                                                 read-block-comment)
                                       ignore-whitespace)))
@@ -1163,9 +1155,9 @@
                                                      read-list-destructure
                                                      (grmr/any read-inline-body
                                                                (grmr/one-or-more read-expr)
-                                                               (error "Body of 'main' fn is wrong"))
+                                                               (grmr/error "Body of 'main' fn is wrong"))
                                                      read-close-paren)
-                                      (error "'main' fn expression is wrong")))))
+                                      (grmr/error "'main' fn expression is wrong")))))
 
 (def read-def
   (grmr/rule "def"
@@ -1188,7 +1180,7 @@
                                       (grmr/apply-fn ast/declare
                                                      read-symbol
                                                      read-close-paren)
-                                      (error "Invalid 'def' expression")))))
+                                      (grmr/error "Invalid 'def' expression")))))
 
 (def read-prototype
   (grmr/rule "prototype"
@@ -1203,7 +1195,7 @@
                                                       (grmr/any read-inline-body
                                                                 (grmr/none-or-more read-expr))
                                                       read-close-paren)
-                                       (error "Invalid prototype function"))))))
+                                       (grmr/error "Invalid prototype function"))))))
 
 (def read-defprotocol
   (grmr/rule "defprotocol"
@@ -1219,7 +1211,7 @@
                                                       (grmr/any read-block-comment
                                                                 read-prototype))
                                                      read-close-paren)
-                                      (error "Invalid 'defprotocol' expression")))))
+                                      (grmr/error "Invalid 'defprotocol' expression")))))
 
 (def read-defn
   (grmr/rule "defn"
@@ -1235,7 +1227,7 @@
                                                      (grmr/ignore (grmr/one-or-more whitespace))
                                                      read-arities
                                                      read-close-paren)
-                                      (error "Invalid 'defn' expression")))))
+                                      (grmr/error "Invalid 'defn' expression")))))
 
 (def read-extend-type
   (grmr/rule "extend-type"
@@ -1248,7 +1240,7 @@
                                                      read-symbol
                                                      (grmr/one-or-more read-proto-impls)
                                                      read-close-paren)
-                                      (error "Invalid 'extend-type' expression")))))
+                                      (grmr/error "Invalid 'extend-type' expression")))))
 
 (def read-deftype
   (grmr/rule "deftype"
@@ -1262,7 +1254,7 @@
                                                      read-list-destructure
                                                      (grmr/none-or-more read-proto-impls)
                                                      read-close-paren)
-                                      (error "invalid 'deftype' expression")))))
+                                      (grmr/error "invalid 'deftype' expression")))))
 
 (def read-JS-callable
   (grmr/rule "JS-callable"
@@ -1278,7 +1270,7 @@
                                                       (grmr/one-or-more whitespace))
                                                      read-integer
                                                      read-close-paren)
-                                      (error "invalid 'JS-callable' expression")))))
+                                      (grmr/error "invalid 'JS-callable' expression")))))
 
 (defn kw-string-arg [kw-sym]
   (grmr/apply-fn (fn [kw-sym value]
@@ -1315,7 +1307,7 @@
                                                      read-string
                                                      read-git-kwargs
                                                      read-close-paren)
-                                      (error "Invalid 'git-dependency' expression")))))
+                                      (grmr/error "Invalid 'git-dependency' expression")))))
 
 (def read-module-spec
   (grmr/rule "module"
@@ -1327,7 +1319,7 @@
                                                       (grmr/one-or-more whitespace))
                                                      read-string
                                                      read-close-paren)
-                                      (error "Invalid 'module' expression")))))
+                                      (grmr/error "Invalid 'module' expression")))))
 
 (def read-add-ns
   (grmr/rule "add-ns"
@@ -1341,12 +1333,12 @@
                                                      (grmr/any read-module-spec
                                                                read-git-dep-spec)
                                                      read-close-paren)
-                                      (error "Invalid 'add-ns' expression")))))
+                                      (grmr/error "Invalid 'add-ns' expression")))))
 
 (def bad-expr
   (grmr/rule "bad-expr"
              (grmr/all ignore-whitespace "("
-                       (error "Invalid expression"))))
+                       (grmr/error "Invalid expression"))))
 
 (def shebang (grmr/apply-fn (fn []
                               ;; just a dummy ast that does nothing
