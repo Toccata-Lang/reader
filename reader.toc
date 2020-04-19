@@ -13,6 +13,9 @@
                             "ast.toc"
                             :sha "a7f3946"))
 
+(add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
+                          "constraints.toc"
+                          :sha "4529b1f"))
 
 (defn min [x y]
   (either (< x y)
@@ -455,36 +458,6 @@
 (def read-sub-type-expr
   (grmr/recurse "type-expr"))
 
-(def read-vector-assertion
-  (grmr/rule "assert-vector-of"
-             (grmr/apply-fn ast/assert-vector-of
-                            read-open-paren
-                            ignore-whitespace
-                            (grmr/ignore "vector-of")
-                            (grmr/ignore (grmr/one-or-more whitespace))
-                            read-sub-type-expr
-                            read-close-paren)))
-
-(def read-list-assertion
-  (grmr/rule "assert-list-of"
-             (grmr/apply-fn ast/assert-list-of
-                            read-open-paren
-                            ignore-whitespace
-                            (grmr/ignore "list-of")
-                            (grmr/ignore (grmr/one-or-more whitespace))
-                            read-sub-type-expr
-                            read-close-paren)))
-
-(def read-maybe-assertion
-  (grmr/rule "assert-maybe-of"
-             (grmr/apply-fn ast/assert-maybe-of
-                            read-open-paren
-                            ignore-whitespace
-                            (grmr/ignore "maybe-of")
-                            (grmr/ignore (grmr/one-or-more whitespace))
-                            read-sub-type-expr
-                            read-close-paren)))
-
 (def read-map-assertion
   (grmr/rule "assert-map-of"
              (grmr/apply-fn ast/assert-map-of
@@ -495,26 +468,6 @@
                             read-sub-type-expr
                             (grmr/ignore (grmr/one-or-more whitespace))
                             read-sub-type-expr
-                            read-close-paren)))
-
-(def read-type-expr
-  (grmr/recursive-rule "type-expr"
-                       (grmr/any read-symbol
-                                 read-maybe-assertion
-                                 read-map-assertion
-                                 read-vector-assertion
-                                 read-list-assertion)))
-
-(def read-type-assertion
-  (grmr/rule "assert-type"
-             (grmr/apply-fn ast/assert-type
-                            read-open-paren
-                            ignore-whitespace
-                            (grmr/ignore "instance?")
-                            (grmr/ignore (grmr/one-or-more whitespace))
-                            read-type-expr
-                            (grmr/ignore (grmr/one-or-more whitespace))
-                            read-symbol
                             read-close-paren)))
 
 (def read-max-val-assertion
@@ -541,16 +494,74 @@
                             read-symbol
                             read-close-paren)))
 
+(def read-sum-type
+  (grmr/rule "sum-type"
+             (grmr/apply-fn ast/value-of
+                            read-open-paren
+                            ignore-whitespace
+                            (grmr/ignore "value-of")
+                            (grmr/one-or-more (grmr/apply-fn identity
+                                                             (grmr/ignore (grmr/one-or-more whitespace))
+                                                             read-symbol))
+                            read-close-paren)))
+
+(def generic-assertions
+  {"vector-of" ast/assert-vector-of
+   "list-of" ast/assert-list-of
+   "maybe-of" ast/assert-maybe-of
+   })
+
+(def read-generic-type
+  (grmr/rule "generic-type"
+             (grmr/apply-fn (fn [base-string file-name line-number inner-type]
+                              ((either (get generic-assertions base-string)
+                                        (fn [_]
+                                          (print-err "No generic type" (str "'" base-string "'") "exists. At"
+                                                     file-name ": " line-number)
+                                          (abort)))
+                               inner-type))
+                            read-open-paren
+                            ignore-whitespace
+                            (apply grmr/any (keys generic-assertions))
+                            (grmr/get-value 'file-name)
+                            (grmr/get-value 'line-number)
+                            (grmr/ignore (grmr/one-or-more whitespace))
+                            (grmr/any read-sum-type
+                                      read-symbol)
+                            read-close-paren)))
+
+(def read-type-expr
+  (grmr/recursive-rule "type-expr"
+                       (grmr/any read-sum-type
+                                 ;; TODO: eventually
+                                 ;; read-map-assertion
+                                 read-generic-type
+                                 (grmr/apply-fn ast/assert-type
+                                                read-symbol))))
+
+(def read-type-assertion
+  (grmr/rule "assertion-type"
+             (grmr/any (grmr/apply-fn (fn [type-expr sym]
+                                        (c/update-sym type-expr sym))
+                                      read-open-paren
+                                      ignore-whitespace
+                                      (grmr/ignore "instance?")
+                                      (grmr/ignore (grmr/one-or-more whitespace))
+                                      read-type-expr
+                                      (grmr/ignore (grmr/one-or-more whitespace))
+                                      read-symbol
+                                      read-close-paren)
+                       read-min-count-assertion
+                       read-min-val-assertion
+                       read-max-val-assertion)))
+
 (def read-assert
   (grmr/rule "assert"
              (grmr/apply-fn identity
                             read-open-paren
                             (grmr/ignore "assert")
                             (grmr/ignore (grmr/one-or-more whitespace))
-                            (grmr/any read-type-assertion
-                                      read-min-count-assertion
-                                      read-min-val-assertion
-                                      read-max-val-assertion)
+                            read-type-assertion
                             read-close-paren)))
 
 (def read-assert-result
@@ -561,9 +572,7 @@
                             (grmr/ignore (grmr/one-or-more whitespace))
                             read-symbol
                             (grmr/ignore (grmr/one-or-more whitespace))
-                            (grmr/any read-type-assertion
-                                      read-min-val-assertion
-                                      read-max-val-assertion)
+                            read-type-assertion
                             read-close-paren)))
 
 (def read-comp
