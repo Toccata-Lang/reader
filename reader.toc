@@ -496,10 +496,10 @@
 
 (def read-sum-type
   (grmr/rule "sum-type"
-             (grmr/apply-fn ast/value-of
+             (grmr/apply-fn ast/any-of
                             read-open-paren
                             ignore-whitespace
-                            (grmr/ignore "value-of")
+                            (grmr/ignore "any-of")
                             (grmr/one-or-more (grmr/apply-fn identity
                                                              (grmr/ignore (grmr/one-or-more whitespace))
                                                              read-symbol))
@@ -533,8 +533,7 @@
 (def read-type-expr
   (grmr/recursive-rule "type-expr"
                        (grmr/any read-sum-type
-                                 ;; TODO: eventually
-                                 ;; read-map-assertion
+                                 read-map-assertion
                                  read-generic-type
                                  (grmr/apply-fn ast/assert-type
                                                 read-symbol))))
@@ -1077,6 +1076,11 @@
                                       read-block-comment
                                       ignore-whitespace))))
 
+;; TODO: the expansion for this expression is horribly inefficient
+;; (for [name name-list
+;;       :when (maybe 'not)]
+;;   (extract (maybe 'not)))
+
 (def read-for
   (grmr/rule "for"
              (grmr/apply-fn identity
@@ -1182,6 +1186,9 @@
                                                      (grmr/ignore (grmr/one-or-more whitespace))
                                                      (grmr/none-or-more read-block-comment)
                                                      (grmr/any read-inline
+                                                               read-sum-type
+                                                               read-map-assertion
+                                                               read-generic-type
                                                                read-expr)
                                                      ignore-whitespace
                                                      (grmr/none-or-more read-block-comment)
@@ -1358,15 +1365,15 @@
 
 (def top-level
   (grmr/recursive-rule "top-level"
-                       (grmr/any read-main
-                                 read-JS-callable
-                                 read-inline
+                       (grmr/any read-defn
                                  read-def
                                  read-defprotocol
-                                 read-defn
-                                 read-extend-type
                                  read-deftype
+                                 read-extend-type
                                  read-block-comment
+                                 read-main
+                                 read-JS-callable
+                                 read-inline
                                  read-add-ns
                                  shebang
                                  bad-expr)))
