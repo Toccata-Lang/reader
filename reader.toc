@@ -466,7 +466,7 @@
                                                [(ast/file-name c) (ast/line-number c)]))
                                         ["" 0])
         path (list [file-name line-number])]
-    (c/SumConstraint type-exprs path (maybe (ast/tag "" file-name line-number)) "")))
+    (c/SumConstraint type-exprs path (maybe (symbol "")) "")))
 
 (defn assert-type [type-sym]
   (c/TypeConstraint {} (list [(ast/file-name type-sym) (ast/line-number type-sym)])
