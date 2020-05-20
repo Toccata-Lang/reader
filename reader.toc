@@ -218,9 +218,25 @@
 
 (def ignore-newlines (grmr/ignore (grmr/none-or-more newline)))
 
+(def read-block-comment
+  (grmr/rule "block-comment"
+             (grmr/apply-fn ast/block-comment
+                            (grmr/get-value 'file-name)
+                            (grmr/get-value 'line-number)
+                            (grmr/one-or-more
+                             (grmr/apply-fn identity
+                                            (grmr/ignore (grmr/none-or-more (grmr/any linear-whitespace
+                                                                                      "\r"
+                                                                                      newline)))
+                                            (grmr/ignore (grmr/one-or-more ";"))
+                                            (grmr/apply-fn to-str
+                                                           (grmr/none-or-more not-eol))
+                                            (grmr/ignore newline))))))
+
 (def whitespace
   (grmr/rule "whitespace"
-             (grmr/any linear-whitespace
+             (grmr/any read-block-comment
+                       linear-whitespace
                        "\r"
                        newline)))
 
@@ -267,22 +283,6 @@
                                                                           (grmr/one-or-more whitespace))))
                                            read-string
                                            read-close-paren))))
-
-(def read-block-comment
-  (grmr/rule "block-comment"
-             (grmr/apply-fn ast/block-comment
-                            (grmr/get-value 'file-name)
-                            (grmr/get-value 'line-number)
-                            (grmr/one-or-more
-                             (grmr/apply-fn identity
-                                            ignore-whitespace
-                                            (grmr/ignore (grmr/one-or-more ";"))
-                                            (grmr/apply-fn to-str
-                                                           (grmr/none-or-more not-eol))
-                                            (grmr/ignore newline))))))
-
-(def ignore-comment
-  (grmr/ignore read-block-comment))
 
 (def read-call
   (grmr/rule "call"
@@ -458,7 +458,32 @@
                             read-symbol
                             read-close-paren)))
 
-(defn any-of [type-exprs]
+(defn assert-type [type-sym]
+  (c/TypeConstraint {} (list [(ast/file-name type-sym) (ast/line-number type-sym)])
+                    type-sym nothing ""))
+
+(defn make-all-of [type-exprs]
+  (assert (instance? (vector-of c/ValueConstraint) type-exprs))
+
+  (let [[file-name line-number] (either (map (first type-exprs)
+                                             (fn [c]
+                                               [(ast/file-name c) (ast/line-number c)]))
+                                        ["" 0])
+        path (list [file-name line-number])]
+    (c/MultiConstraint type-exprs)))
+
+(def read-multi-type
+  (grmr/rule "sum-type"
+             (grmr/apply-fn make-all-of
+                            read-open-paren
+                            ignore-whitespace
+                            (grmr/ignore "all-of")
+                            (grmr/one-or-more (grmr/apply-fn identity
+                                                             (grmr/ignore (grmr/one-or-more whitespace))
+                                                             (grmr/apply-fn assert-type read-symbol)))
+                            read-close-paren)))
+
+(defn make-any-of [type-exprs]
   (assert (instance? (vector-of c/ValueConstraint) type-exprs))
 
   (let [[file-name line-number] (either (map (first type-exprs)
@@ -468,13 +493,9 @@
         path (list [file-name line-number])]
     (c/SumConstraint type-exprs path (maybe (symbol "")) "")))
 
-(defn assert-type [type-sym]
-  (c/TypeConstraint {} (list [(ast/file-name type-sym) (ast/line-number type-sym)])
-                    type-sym nothing ""))
-
 (def read-sum-type
   (grmr/rule "sum-type"
-             (grmr/apply-fn any-of
+             (grmr/apply-fn make-any-of
                             read-open-paren
                             ignore-whitespace
                             (grmr/ignore "any-of")
@@ -504,11 +525,22 @@
     (c/MultiConstraint [(c/TypeConstraint {c/MaybeType #{}} path 'Maybe nothing "")
                         (c/CollectionOf type-expr path nothing "")])))
 
+(defn assert-set-of [type-expr]
+  (assert (instance? c/ValueConstraint type-expr))
+
+  (let [path (list [(ast/file-name type-expr) (ast/line-number type-expr)])]
+    (c/MultiConstraint [(c/TypeConstraint {c/HashSetType #{'set-map}} path 'HashSet nothing "")
+                        (c/CollectionOf type-expr path nothing "")])))
+
 (def generic-assertions
   {"vector-of" assert-vector-of
    "list-of" assert-list-of
    "maybe-of" assert-maybe-of
+   "set-of" assert-set-of
    })
+   ;; agent-of
+   ;; promise-of
+   ;; future-of
 
 (def read-generic-type
   (grmr/rule "generic-type"
@@ -526,12 +558,14 @@
                             (grmr/get-value 'line-number)
                             (grmr/ignore (grmr/one-or-more whitespace))
                             (grmr/any read-sum-type
+                                      read-multi-type
                                       (grmr/apply-fn assert-type read-symbol))
                             read-close-paren)))
 
 (def read-type-expr
   (grmr/recursive-rule "type-expr"
                        (grmr/any read-sum-type
+                                 read-multi-type
                                  read-map-assertion
                                  read-generic-type
                                  (grmr/apply-fn assert-type read-symbol))))
@@ -567,7 +601,8 @@
                             read-open-paren
                             (grmr/ignore "assert-result")
                             (grmr/ignore (grmr/one-or-more whitespace))
-                            read-symbol
+                            ;; TODO: remove this when code formatter is ready
+                            (grmr/ignore (grmr/optional read-symbol))
                             (grmr/ignore (grmr/one-or-more whitespace))
                             read-type-assertion
                             read-close-paren)))
@@ -943,8 +978,7 @@
   (grmr/rule "for-let"
              (grmr/apply-fn (fn [bindings]
                               (ForLetExpr bindings))
-                            (grmr/any ignore-whitespace
-                                      ignore-comment)
+                            ignore-whitespace
                             (grmr/ignore ":let")
                             (grmr/ignore (grmr/one-or-more whitespace))
                             (grmr/ignore "[")
@@ -966,8 +1000,7 @@
   (grmr/rule "for-when"
              (grmr/apply-fn (fn [clause]
                               (ForWhenExpr clause))
-                            (grmr/any ignore-whitespace
-                                      ignore-comment)
+                            ignore-whitespace
                             (grmr/ignore ":when")
                             (grmr/ignore (grmr/one-or-more whitespace))
                             read-sub-expr)))
@@ -986,8 +1019,7 @@
   (grmr/rule "for-when-not"
              (grmr/apply-fn (fn [clause]
                               (ForWhenNotExpr clause))
-                            (grmr/any ignore-whitespace
-                                      ignore-comment)
+                            ignore-whitespace
                             (grmr/ignore ":when-not")
                             (grmr/ignore (grmr/one-or-more whitespace))
                             read-sub-expr)))
@@ -1185,6 +1217,7 @@
                                                      (grmr/none-or-more read-block-comment)
                                                      (grmr/any read-inline
                                                                read-sum-type
+                                                               read-multi-type
                                                                read-map-assertion
                                                                read-generic-type
                                                                read-expr)
@@ -1356,7 +1389,7 @@
 
 (def shebang (grmr/apply-fn (fn []
                               ;; just a dummy ast that does nothing
-                              (ast/inline-ast 'C nothing "" "" 0))
+                              (ast/inline-ast (ast/tag 'C) nothing "" "" 0))
                             (grmr/ignore (grmr/all "#!"
                                                    (grmr/none-or-more not-eol)
                                                    newline))))
