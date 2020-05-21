@@ -504,53 +504,29 @@
                                                              (grmr/apply-fn assert-type read-symbol)))
                             read-close-paren)))
 
-(defn assert-vector-of [type-expr]
-  (assert (instance? c/ValueConstraint type-expr))
-
-  (let [path (list [(ast/file-name type-expr) (ast/line-number type-expr)])]
-    (c/MultiConstraint [(c/TypeConstraint {c/VectorType #{}} path 'Vector nothing "")
-                        (c/CollectionOf type-expr path nothing "")])))
-
-(defn assert-list-of [type-expr]
-  (assert (instance? c/ValueConstraint type-expr))
-
-  (let [path (list [(ast/file-name type-expr) (ast/line-number type-expr)])]
-    (c/MultiConstraint [(c/TypeConstraint {c/ListType #{}} path 'List nothing "")
-                        (c/CollectionOf type-expr path nothing "")])))
-
-(defn assert-maybe-of [type-expr]
-  (assert (instance? c/ValueConstraint type-expr))
-
-  (let [path (list [(ast/file-name type-expr) (ast/line-number type-expr)])]
-    (c/MultiConstraint [(c/TypeConstraint {c/MaybeType #{}} path 'Maybe nothing "")
-                        (c/CollectionOf type-expr path nothing "")])))
-
-(defn assert-set-of [type-expr]
-  (assert (instance? c/ValueConstraint type-expr))
-
-  (let [path (list [(ast/file-name type-expr) (ast/line-number type-expr)])]
-    (c/MultiConstraint [(c/TypeConstraint {c/HashSetType #{'set-map}} path 'HashSet nothing "")
-                        (c/CollectionOf type-expr path nothing "")])))
-
 (def generic-assertions
-  {"vector-of" assert-vector-of
-   "list-of" assert-list-of
-   "maybe-of" assert-maybe-of
-   "set-of" assert-set-of
+  {"vector-of" 'Vector
+   "list-of" 'List
+   "maybe-of" 'Maybe
+   "set-of" 'HashSet
+   "agent-of" 'Agent
+   "promise-of" 'Promise
+   ;; "future-of" 'Future
    })
-   ;; agent-of
-   ;; promise-of
-   ;; future-of
 
 (def read-generic-type
   (grmr/rule "generic-type"
-             (grmr/apply-fn (fn [base-string file-name line-number inner-type]
-                              ((either (get generic-assertions base-string)
-                                        (fn [_]
-                                          (print-err "No generic type" (str "'" base-string "'") "exists. At"
-                                                     file-name ": " line-number)
-                                          (abort)))
-                               inner-type))
+             (grmr/apply-fn (fn [base-string file-name line-number contents-type]
+                              (let [coll-type-name (either (get generic-assertions base-string)
+                                                           (fn [_]
+                                                             (print-err "No generic type" (str "'" base-string "'")
+                                                                        "exists. At" file-name ": " line-number)
+                                                             (abort)))
+                                    collection-type (c/TypeConstraint {} empty-list coll-type-name  nothing "")]
+                                (c/update-path
+                                 (c/MultiConstraint [collection-type
+                                                     (c/CollectionOf contents-type empty-list nothing "")])
+                                 file-name line-number)))
                             read-open-paren
                             ignore-whitespace
                             (apply grmr/any (keys generic-assertions))
