@@ -309,7 +309,6 @@
                        (grmr/any read-list-destructure
                                  read-arg)))
 (def read-let-binding
-  ;; TODO: accept comments as well
   (grmr/rule "let-binding"
              (grmr/apply-fn ast/binding
                             ignore-whitespace
@@ -375,36 +374,65 @@
                             read-open-paren
                             (grmr/ignore "either")
                             (grmr/ignore (grmr/one-or-more whitespace))
-                            ;; TODO: make sure no literal values are here
-                            ;; TODO: allow comments in either expr
                             read-sub-expr
                             read-sub-expr
                             read-close-paren)))
 
-(defn assert-min-count [sym len]
-  (assert (instance? ast/tagged-symbol sym))
+(defn assert-min-count [file-name line-number len]
   ;; TODO: what was I thinking doing it this way. (Actually, I know.)
-  (c/ItemsConstraint (repeat len c/top-type)
-                     c/coll-of-any
-                     (list [(ast/file-name sym) (ast/line-number sym)])
-                     ;; TODO: remove the 'untag' and it should throw an assertion
-                     (maybe (ast/untag sym))
-                     ""))
+  (c/ItemsConstraint (repeat len c/top-type) c/coll-of-any
+                     (list [file-name line-number]) nothing ""))
 
 (def read-min-count-assertion
   (grmr/rule "assert-min-count"
              (grmr/apply-fn assert-min-count
                             read-open-paren
                             ignore-whitespace
+                            (grmr/get-value 'file-name)
+                            (grmr/get-value 'line-number)
                             (grmr/ignore "min-count")
-                            (grmr/ignore (grmr/one-or-more whitespace))
-                            read-symbol
                             (grmr/ignore (grmr/one-or-more whitespace))
                             read-integer
                             read-close-paren)))
 
-(def read-sub-type-expr
+(defn assert-max-value [file-name line-number max]
+  (c/MaxValue max (list [file-name line-number])
+              nothing ""))
+
+(def read-max-val-assertion
+  (grmr/rule "assert-max"
+             (grmr/apply-fn assert-max-value
+                            read-open-paren
+                            ignore-whitespace
+                            (grmr/get-value 'file-name)
+                            (grmr/get-value 'line-number)
+                            (grmr/ignore "max")
+                            (grmr/ignore (grmr/one-or-more whitespace))
+                            read-integer
+                            read-close-paren)))
+
+(defn assert-min-value [file-name line-number min]
+  (c/MinValue min (list [file-name line-number])
+              nothing ""))
+
+(def read-min-val-assertion
+  (grmr/rule "assert-min"
+             (grmr/apply-fn assert-min-value
+                            read-open-paren
+                            ignore-whitespace
+                            (grmr/get-value 'file-name)
+                            (grmr/get-value 'line-number)
+                            (grmr/ignore "min")
+                            (grmr/ignore (grmr/one-or-more whitespace))
+                            read-integer
+                            read-close-paren)))
+
+(def read-sub-type
   (grmr/recurse "type-expr"))
+
+(defn assert-type [type-sym]
+  (c/TypeConstraint {} (list [(ast/file-name type-sym) (ast/line-number type-sym)])
+                    type-sym nothing ""))
 
 (defn assert-map-of [key-type val-type]
   (assert (instance? c/ValueConstraint key-type))
@@ -421,46 +449,10 @@
                             ignore-whitespace
                             (grmr/ignore "map-of")
                             (grmr/ignore (grmr/one-or-more whitespace))
-                            read-sub-type-expr
+                            read-sub-type
                             (grmr/ignore (grmr/one-or-more whitespace))
-                            read-sub-type-expr
+                            read-sub-type
                             read-close-paren)))
-
-(defn assert-max-value [max sym]
-  (c/MaxValue max (list [(ast/file-name sym) (ast/line-number sym)])
-              (maybe (ast/untag sym)) ""))
-
-(def read-max-val-assertion
-  (grmr/rule "assert-max"
-             (grmr/apply-fn assert-max-value
-                            read-open-paren
-                            ignore-whitespace
-                            (grmr/ignore "max")
-                            (grmr/ignore (grmr/one-or-more whitespace))
-                            read-integer
-                            (grmr/ignore (grmr/one-or-more whitespace))
-                            read-symbol
-                            read-close-paren)))
-
-(defn assert-min-value [min sym]
-  (c/MinValue min (list [(ast/file-name sym) (ast/line-number sym)])
-              (maybe (ast/untag sym)) ""))
-
-(def read-min-val-assertion
-  (grmr/rule "assert-min"
-             (grmr/apply-fn assert-min-value
-                            read-open-paren
-                            ignore-whitespace
-                            (grmr/ignore "min")
-                            (grmr/ignore (grmr/one-or-more whitespace))
-                            read-integer
-                            (grmr/ignore (grmr/one-or-more whitespace))
-                            read-symbol
-                            read-close-paren)))
-
-(defn assert-type [type-sym]
-  (c/TypeConstraint {} (list [(ast/file-name type-sym) (ast/line-number type-sym)])
-                    type-sym nothing ""))
 
 (defn make-all-of [type-exprs]
   (assert (instance? (vector-of c/ValueConstraint) type-exprs))
@@ -478,9 +470,7 @@
                             read-open-paren
                             ignore-whitespace
                             (grmr/ignore "all-of")
-                            (grmr/one-or-more (grmr/apply-fn identity
-                                                             (grmr/ignore (grmr/one-or-more whitespace))
-                                                             (grmr/apply-fn assert-type read-symbol)))
+                            (grmr/one-or-more read-sub-type)
                             read-close-paren)))
 
 (defn make-any-of [type-exprs]
@@ -499,9 +489,7 @@
                             read-open-paren
                             ignore-whitespace
                             (grmr/ignore "any-of")
-                            (grmr/one-or-more (grmr/apply-fn identity
-                                                             (grmr/ignore (grmr/one-or-more whitespace))
-                                                             (grmr/apply-fn assert-type read-symbol)))
+                            (grmr/one-or-more read-sub-type)
                             read-close-paren)))
 
 (def generic-assertions
@@ -511,8 +499,8 @@
    "set-of" 'HashSet
    "agent-of" 'Agent
    "promise-of" 'Promise
-   ;; "future-of" 'Future
    })
+   ;; "future-of" 'Future
 
 (def read-generic-type
   (grmr/rule "generic-type"
@@ -532,10 +520,7 @@
                             (apply grmr/any (keys generic-assertions))
                             (grmr/get-value 'file-name)
                             (grmr/get-value 'line-number)
-                            (grmr/ignore (grmr/one-or-more whitespace))
-                            (grmr/any read-sum-type
-                                      read-multi-type
-                                      (grmr/apply-fn assert-type read-symbol))
+                            read-sub-type
                             read-close-paren)))
 
 (def read-type-expr
@@ -544,23 +529,25 @@
                                  read-multi-type
                                  read-map-assertion
                                  read-generic-type
-                                 (grmr/apply-fn assert-type read-symbol))))
+                                 read-min-count-assertion
+                                 read-min-val-assertion
+                                 read-max-val-assertion
+                                 (grmr/apply-fn assert-type
+                                                ignore-whitespace
+                                                read-symbol))))
 
 (def read-type-assertion
   (grmr/rule "assertion-type"
-             (grmr/any (grmr/apply-fn (fn [type-expr sym]
-                                        (c/update-sym type-expr (ast/untag sym)))
-                                      read-open-paren
-                                      ignore-whitespace
-                                      (grmr/ignore "instance?")
-                                      (grmr/ignore (grmr/one-or-more whitespace))
-                                      read-type-expr
-                                      (grmr/ignore (grmr/one-or-more whitespace))
-                                      read-symbol
-                                      read-close-paren)
-                       read-min-count-assertion
-                       read-min-val-assertion
-                       read-max-val-assertion)))
+             (grmr/apply-fn (fn [type-expr sym]
+                              (c/update-sym type-expr (ast/untag sym)))
+                            read-open-paren
+                            ignore-whitespace
+                            (grmr/ignore "instance?")
+                            (grmr/ignore (grmr/one-or-more whitespace))
+                            read-type-expr
+                            (grmr/ignore (grmr/one-or-more whitespace))
+                            read-symbol
+                            read-close-paren)))
 
 (def read-assert
   (grmr/rule "assert"
@@ -1100,7 +1087,6 @@
                                                      (grmr/any (grmr/none-or-more read-for-binding)
                                                                (grmr/error "Invalid 'for' bindings"))
                                                      (grmr/ignore "]")
-                                                     ;; TODO: allow comments in body
                                                      (grmr/any read-sub-expr
                                                                (grmr/error "Invalid 'for' body")))
                                       (grmr/error "Invalid 'for' expression"))
@@ -1277,7 +1263,7 @@
                                                      read-list-destructure
                                                      (grmr/none-or-more read-proto-impls)
                                                      read-close-paren)
-                                      (grmr/error "invalid 'deftype' expression")))))
+                                      (grmr/error "Invalid 'deftype' expression")))))
 
 (def read-JS-callable
   (grmr/rule "JS-callable"
