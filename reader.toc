@@ -235,7 +235,9 @@
 
 (def whitespace
   (grmr/rule "whitespace"
-             (grmr/any read-block-comment
+             (grmr/any (grmr/all (grmr/one-or-more ";")
+                                 (grmr/none-or-more not-eol)
+                                 newline)
                        linear-whitespace
                        "\r"
                        newline)))
@@ -375,6 +377,22 @@
                             (grmr/ignore "either")
                             (grmr/ignore (grmr/one-or-more whitespace))
                             read-sub-expr
+                            read-sub-expr
+                            read-close-paren)))
+
+(def read-cond-val
+  (grmr/rule "cond-value"
+             (grmr/apply-fn ast/cond-val-expr
+                            read-sub-expr
+                            read-sub-expr)))
+
+(def read-cond
+  (grmr/rule "cond"
+             (grmr/apply-fn ast/cond-expr
+                            read-open-paren
+                            (grmr/ignore "cond")
+                            (grmr/ignore (grmr/one-or-more whitespace))
+                            (grmr/one-or-more read-cond-val)
                             read-sub-expr
                             read-close-paren)))
 
@@ -1132,6 +1150,7 @@
                                                 read-or
                                                 read-and
                                                 read-either
+                                                read-cond
                                                 read-fn
                                                 read-let
                                                 read-do
