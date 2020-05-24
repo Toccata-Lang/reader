@@ -893,20 +893,17 @@
   (nest-when [body clause wrapper]
     (let [fn (ast/file-name clause)
           ln (ast/line-number clause)]
-      (ast/either-ast
-       (ast/and-expr [clause (ast/call-ast (ast/tag 'maybe fn ln) [body])])
+      (ast/cond-ast
+       [(ast/cond-val-ast clause body)]
        (ast/call-ast (ast/tag 'zero fn ln)
-                     [(ast/call-ast (ast/tag 'zero fn ln)
-                                    [wrapper])]))))
+                     [wrapper]))))
 
   (nest-when-not [body clause wrapper]
     (let [fn (ast/file-name clause)
           ln (ast/line-number clause)]
-      (ast/either-ast
-       (ast/and-expr
-        [clause (ast/call-ast (ast/tag 'maybe fn ln)
-                              [(ast/call-ast (ast/tag 'zero fn ln)
-                                             [wrapper])])])
+      (ast/cond-ast
+       [(ast/cond-val-ast clause (ast/call-ast (ast/tag 'zero fn ln)
+                                               [wrapper]))]
        body)))
 
   (nest-binding [body binding wrapper]))
@@ -930,6 +927,15 @@
                                                [body])])])))
 
 (extend-type ast/either-ast
+  ForBinding
+  (nest-binding [body binding wrapper]
+    (ast/call-ast (ast/tag 'flat-map (ast/file-name binding) (ast/line-number binding))
+                  [(.val binding)
+                   (ast/fn-expr nothing
+                                [(ast/fn-arity (ast/params [(.binding binding)]) ""
+                                               [body])])])))
+
+(extend-type ast/cond-ast
   ForBinding
   (nest-binding [body binding wrapper]
     (ast/call-ast (ast/tag 'flat-map (ast/file-name binding) (ast/line-number binding))
@@ -1015,19 +1021,10 @@
           ln (ast/line-number clause)]
       (ast/call-ast
        (ast/tag 'flat-map fn ln)
-       [(ast/call-ast
-         (ast/tag 'extract fn ln)
-         [(ast/or-expr
-           [(ast/and-expr [clause
-                                (ast/call-ast
-                                 (ast/tag 'maybe fn ln)
-                                 [(ast/call-ast (ast/tag 'wrap fn ln)
-                                                [wrapper body])])])
-            (ast/call-ast
-             (ast/tag 'maybe fn ln)
-             [(ast/call-ast (ast/tag 'zero fn ln)
-                            [(ast/call-ast (ast/tag 'zero fn ln)
-                                           [wrapper])])])])])
+       [(ast/cond-ast [(ast/cond-val-ast clause (ast/call-ast (ast/tag 'wrap fn ln)
+                                                               [wrapper body]))]
+                       (ast/call-ast (ast/tag 'zero fn ln)
+                                     [wrapper]))
         (ast/fn-expr nothing
                      [(ast/fn-arity (ast/params [(ast/tag "#x" fn ln)]) ""
                                     [(ast/call-ast (ast/tag 'wrap fn ln)
@@ -1038,16 +1035,8 @@
           ln (ast/line-number clause)]
       (ast/call-ast
        (ast/tag 'flat-map fn ln)
-       [(ast/call-ast
-         (ast/tag 'extract fn ln)
-         [(ast/or-expr
-           [(ast/and-expr [clause
-                                (ast/call-ast
-                                 (ast/tag 'maybe fn ln)
-                                 [(ast/call-ast (ast/tag 'zero fn ln) [wrapper])])])
-            (ast/call-ast
-             (ast/tag 'maybe fn ln)
-             [(ast/call-ast (ast/tag 'wrap fn ln) [wrapper body])])])])
+       [(ast/cond-ast [(ast/cond-val-ast clause (ast/call-ast (ast/tag 'zero fn ln) [wrapper]))]
+                      (ast/call-ast (ast/tag 'wrap fn ln) [wrapper body]))
         (ast/fn-expr nothing
                      [(ast/fn-arity (ast/params [(ast/tag "#x" fn ln)]) ""
                                     [(ast/call-ast (ast/tag 'wrap fn ln)
@@ -1086,11 +1075,6 @@
                        (grmr/apply-fn identity
                                       read-block-comment
                                       ignore-whitespace))))
-
-;; TODO: the expansion for this expression is horribly inefficient
-;; (for [name name-list
-;;       :when (maybe 'not)]
-;;   (extract (maybe 'not)))
 
 (def read-for
   (grmr/rule "for"
