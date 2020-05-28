@@ -472,34 +472,22 @@
                             read-sub-type
                             read-close-paren)))
 
-(defn make-all-of [type-exprs]
-  (assert (instance? (vector-of c/ValueConstraint) type-exprs))
-
-  (let [[file-name line-number] (either (map (first type-exprs)
-                                             (fn [c]
-                                               [(ast/file-name c) (ast/line-number c)]))
-                                        ["" 0])
-        path (list [file-name line-number])]
-    (c/MultiConstraint type-exprs)))
-
 (def read-multi-type
   (grmr/rule "sum-type"
-             (grmr/apply-fn make-all-of
+             (grmr/apply-fn (fn [type-exprs]
+                              (c/MultiConstraint type-exprs))
                             read-open-paren
                             ignore-whitespace
                             (grmr/ignore "all-of")
                             (grmr/one-or-more read-sub-type)
                             read-close-paren)))
 
-(defn make-any-of [type-exprs]
+(defn make-any-of [file line type-exprs]
   (assert (instance? (vector-of c/ValueConstraint) type-exprs))
 
-  (let [[file-name line-number] (either (map (first type-exprs)
-                                             (fn [c]
-                                               [(ast/file-name c) (ast/line-number c)]))
-                                        ["" 0])
-        path (list [file-name line-number])]
-    (c/SumConstraint type-exprs path (maybe (symbol "")) "")))
+  (c/SumConstraint type-exprs
+                   (list [file line])
+                   (maybe (symbol "")) ""))
 
 (def read-sum-type
   (grmr/rule "sum-type"
@@ -507,32 +495,33 @@
                             read-open-paren
                             ignore-whitespace
                             (grmr/ignore "any-of")
+                            (grmr/get-value 'file-name)
+                            (grmr/get-value 'line-number)
                             (grmr/one-or-more read-sub-type)
                             read-close-paren)))
 
 (def generic-assertions
-  {"vector-of" 'Vector
-   "list-of" 'List
-   "maybe-of" 'Maybe
-   "set-of" 'HashSet
-   "agent-of" 'Agent
-   "promise-of" 'Promise
+  {"vector-of" (c/TypeConstraint {c/VectorType #{}} empty-list 'Vector nothing "")
+   "list-of" (c/TypeConstraint {c/ListType #{}} empty-list 'List nothing "")
+   "maybe-of" (c/TypeConstraint {c/MaybeType #{}} empty-list 'Maybe nothing "")
+   "set-of" (c/TypeConstraint {c/HashSetType #{'set-map}} empty-list 'HashSet  nothing "")
+   "agent-of" (c/TypeConstraint {c/AgentType #{}} empty-list 'Agent  nothing "")
+   "promise-of" (c/TypeConstraint {c/PromiseType #{}} empty-list 'Promise  nothing "")
+   "sequence-of" (c/TypeConstraint {c/ListType #{} c/VectorType #{}} empty-list 'Sequence nothing "")
+   "collection-of" c/top-type
    })
    ;; "future-of" 'Future
 
 (def read-generic-type
   (grmr/rule "generic-type"
-             (grmr/apply-fn (fn [base-string file-name line-number contents-type]
-                              (let [coll-type-name (either (get generic-assertions base-string)
-                                                           (fn [_]
-                                                             (print-err "No generic type" (str "'" base-string "'")
-                                                                        "exists. At" file-name ": " line-number)
-                                                             (abort)))
-                                    collection-type (c/TypeConstraint {} empty-list coll-type-name  nothing "")]
-                                (c/update-path
-                                 (c/MultiConstraint [collection-type
-                                                     (c/CollectionOf contents-type empty-list nothing "")])
-                                 file-name line-number)))
+             (grmr/apply-fn (fn [base-string file line contents-type]
+                              (-> (either (get generic-assertions base-string)
+                                          (fn [_]
+                                            (print-err "No generic type" (str "'" base-string "'")
+                                                       "exists. At" file ": " line)
+                                            (abort)))
+                                  (c/intersect (c/CollectionOf contents-type empty-list nothing ""))
+                                  (c/update-path file line)))
                             read-open-paren
                             ignore-whitespace
                             (apply grmr/any (keys generic-assertions))
