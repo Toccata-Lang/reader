@@ -6,16 +6,16 @@
 ;; Components to build the grammar out of
 (add-ns grmr (git-dependency "https://github.com/Toccata-Lang/grammar.git"
                              "grammar.toc"
-                             :sha "5a3a870"))
+                             :sha "fa3764b"))
 
 ;; The different types of nodes in the AST
 (add-ns ast (git-dependency "https://github.com/Toccata-Lang/ast.git"
                             "ast.toc"
-                            :sha "a7f3946"))
+                            :sha "97c5572"))
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
-                          :sha "4529b1f"))
+                          :sha "54d3fc9"))
 
 (defn min [x y]
   (either (< x y)
@@ -577,28 +577,6 @@
                             read-type-assertion
                             read-close-paren)))
 
-(def read-comp
-  (grmr/rule "comp"
-             (grmr/apply-fn identity
-                            (grmr/ignore "(")
-                            ignore-whitespace
-                            (grmr/ignore "comp")
-                            (grmr/ignore (grmr/one-or-more whitespace))
-                            (grmr/any (grmr/apply-fn
-                                       (fn [arg args]
-                                         (let [file-name (ast/file-name arg)
-                                               line-number (ast/line-number arg)
-                                               comp** (ast/tag 'comp* file-name line-number)
-                                               list* (ast/tag 'list file-name line-number)]
-                                           (ast/call-expr [comp** arg
-                                                           (ast/call-expr (cons list*
-                                                                                (seq args)))])))
-                                       read-sub-expr
-                                       (grmr/none-or-more read-sub-expr)
-                                       ignore-whitespace
-                                       (grmr/ignore ")"))
-                                      (grmr/error "Invalid 'comp' form")))))
-
 (def read-apply-to
   (grmr/rule "apply-to"
              (grmr/apply-fn identity
@@ -1127,7 +1105,6 @@
                                                 read-fn
                                                 read-let
                                                 read-do
-                                                read-comp
                                                 read-apply-to
                                                 read-reify
                                                 read-vector
