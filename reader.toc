@@ -661,9 +661,6 @@
                                                      read-close-paren)
                                       (grmr/error "Invalid 'fn' expression")))))
 
-(def TypeCount (inline C Integer "(Value *)&(Integer){IntegerType, -1, TypeCount};"))
-(def type-counter (int-generator TypeCount))
-
 (def read-impl-arity
   (grmr/rule "impl-arity"
              (grmr/apply-fn (fn [params doc body]
@@ -705,7 +702,7 @@
 (def read-reify
   (grmr/rule "reify"
              (grmr/apply-fn (fn [impls]
-                              (ast/reified (extract type-counter) impls))
+                              (ast/reified nothing impls))
                             read-open-paren
                             (grmr/ignore "reify")
                             (grmr/ignore (grmr/one-or-more whitespace))
