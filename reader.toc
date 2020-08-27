@@ -266,26 +266,6 @@
   (grmr/rule "close-paren"
              (grmr/ignore (grmr/all ignore-whitespace ")"))))
 
-(def read-inline
-  (grmr/rule "read-inline"
-             (grmr/apply-fn identity
-                            read-open-paren
-                            (grmr/ignore "inline")
-                            (grmr/ignore (grmr/one-or-more whitespace))
-                            (grmr/apply-fn (fn [file-name line-number lang return-type body]
-                                             (ast/inline-ast lang return-type
-                                                             body file-name line-number))
-                                           (grmr/get-value 'file-name)
-                                           (grmr/get-value 'line-number)
-                                           read-symbol
-                                           (grmr/ignore (grmr/one-or-more whitespace))
-                                           (grmr/optional (grmr/apply-fn identity
-                                                                         read-symbol
-                                                                         (grmr/ignore
-                                                                          (grmr/one-or-more whitespace))))
-                                           read-string
-                                           read-close-paren))))
-
 (def read-call
   (grmr/rule "call"
              (grmr/apply-fn ast/call-expr
@@ -393,7 +373,8 @@
                             (grmr/ignore "cond")
                             (grmr/ignore (grmr/one-or-more whitespace))
                             (grmr/one-or-more read-cond-val)
-                            read-sub-expr
+                            (grmr/any read-sub-expr
+                                      (grmr/error "Missing 'cond' default clause"))
                             read-close-paren)))
 
 (defn assert-min-count [file-name line-number len]
@@ -508,6 +489,7 @@
    "agent-of" (c/TypeConstraint {c/AgentType #{}} empty-list 'Agent  nothing "")
    "promise-of" (c/TypeConstraint {c/PromiseType #{}} empty-list 'Promise  nothing "")
    "sequence-of" (c/TypeConstraint {c/ListType #{} c/VectorType #{}} empty-list 'Sequence nothing "")
+   "function-returns" (c/TypeConstraint {c/FunctionType #{}} empty-list 'Function nothing "")
    "collection-of" c/top-type
    })
    ;; "future-of" 'Future
@@ -605,6 +587,28 @@
                                        ignore-whitespace
                                        (grmr/ignore ")"))
                                       (grmr/error "Invalid 'apply-to' form")))))
+
+(def read-inline
+  (grmr/rule "read-inline"
+             (grmr/apply-fn identity
+                            read-open-paren
+                            (grmr/ignore "inline")
+                            (grmr/ignore (grmr/one-or-more whitespace))
+                            (grmr/any (grmr/apply-fn (fn [file-name line-number lang return-type body]
+                                                       (ast/inline-ast lang (either return-type
+                                                                                    c/top-type)
+                                                                       body file-name line-number))
+                                                     (grmr/get-value 'file-name)
+                                                     (grmr/get-value 'line-number)
+                                                     read-symbol
+                                                     (grmr/ignore (grmr/one-or-more whitespace))
+                                                     (grmr/optional
+                                                      (grmr/apply-fn identity
+                                                                     read-type-expr
+                                                                     (grmr/ignore (grmr/one-or-more whitespace))))
+                                                     read-string
+                                                     read-close-paren)
+                                      (grmr/error "Invalid inline expression")))))
 
 (def read-inline-body
   (grmr/rule "read-inline-body"
@@ -1085,6 +1089,16 @@
                                       (grmr/error "Invalid '->' expression"))
                             read-close-paren)))
 
+(def read-empty-list
+  (grmr/rule "empty-list"
+             (grmr/apply-fn (fn [fn ln]
+                              (ast/call-ast (ast/tag 'list fn ln) []))
+                            (grmr/get-value 'file-name)
+                            (grmr/get-value 'line-number)
+                            (grmr/ignore "(")
+                            ignore-whitespace
+                            (grmr/ignore ")"))))
+
 (def read-expr
   (grmr/recursive-rule "expr"
                        (grmr/apply-fn identity
@@ -1111,6 +1125,7 @@
                                                 read-threading
                                                 read-assert
                                                 read-assert-result
+                                                read-empty-list
                                                 (grmr/all read-inline
                                                           (grmr/error "'inline' expressions not allowed here"))
                                                 read-call
@@ -1315,9 +1330,10 @@
              (grmr/all ignore-whitespace "("
                        (grmr/error "Invalid expression"))))
 
-(def shebang (grmr/apply-fn (fn []
+(def shebang (grmr/apply-fn (fn [file]
                               ;; just a dummy ast that does nothing
-                              (ast/inline-ast (ast/tag 'C) nothing "" "" 0))
+                              (ast/inline-ast (ast/tag 'C) c/top-type "" file 0))
+                            (grmr/get-value 'file-name)
                             (grmr/ignore (grmr/all "#!"
                                                    (grmr/none-or-more not-eol)
                                                    newline))))
