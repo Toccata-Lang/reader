@@ -6,7 +6,7 @@
 ;; Components to build the grammar out of
 (add-ns grmr (git-dependency "https://github.com/Toccata-Lang/grammar.git"
                              "grammar.toc"
-                             :sha "daeac91"))
+                             :sha "4846add"))
 
 ;; The different types of nodes in the AST
 (add-ns ast (git-dependency "https://github.com/Toccata-Lang/ast.git"
@@ -15,7 +15,7 @@
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
-                          :sha "3da68b2"))
+                          :sha "4da8e3d"))
 
 (defn min [x y]
   (either (< x y)
@@ -24,10 +24,13 @@
 ;; sometimes, we have to see what's wrong
 (defn debug [tag]
   (grmr/ignore
-   (grmr/optional (grmr/term-fn (fn [text]
-                                  (print-err tag (count text)
-                                             (str "\"" (subs text 0 (min 40 (count text))) "\""))
-                                  0)))))
+   (apply-to (fn [file text]
+               (cond
+                (= 'core file) 0
+                (print-err tag (count text)
+                           (str "\"" (subs text 0 (min 40 (count text))) "\""))))
+             (grmr/get-value 'file-name)
+             grmr/get-text)))
 
 (def symbol-start
   (grmr/rule "symbol-start"
@@ -503,7 +506,7 @@
    "agent-of" (c/TypeConstraint {c/AgentType #{}} empty-list 'Agent  nothing "")
    "promise-of" (c/TypeConstraint {c/PromiseType #{}} empty-list 'Promise  nothing "")
    "sequence-of" (c/TypeConstraint {c/ListType #{} c/VectorType #{}} empty-list 'Sequence nothing "")
-   "function-returns" (c/TypeConstraint {c/FunctionType #{}} empty-list 'Function nothing "")
+   "function-returns" (c/TypeConstraint {c/FunctionType #{}} empty-list 'Fn nothing "")
    "collection-of" c/top-type
    })
    ;; "future-of" 'Future
@@ -547,7 +550,8 @@
                        ignore-whitespace
                        (grmr/ignore "instance?")
                        (grmr/ignore (grmr/one-or-more whitespace))
-                       read-type-expr
+                       (grmr/any read-type-expr
+                                 (grmr/error "Ivalid type expression"))
                        (grmr/ignore (grmr/one-or-more whitespace))
                        (grmr/any read-symbol
                                  (grmr/error "Missing symbol to assert type of in assertion expression."))
@@ -1385,6 +1389,7 @@
    (apply-to identity
              ignore-whitespace
              (grmr/catch-error
+              .state
               (apply-to identity
                         read-open-paren
                         (grmr/ignore "add-ns")
@@ -1418,6 +1423,7 @@
                        (apply-to identity
                                  ignore-whitespace
                                  (grmr/catch-error
+                                  .state
                                   (grmr/any read-defn
                                             read-def
                                             read-defprotocol
