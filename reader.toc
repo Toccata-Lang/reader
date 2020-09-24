@@ -1383,13 +1383,27 @@
                                            read-close-paren)
                                  (grmr/error "Invalid 'module' expression")))))
 
+(defn output-error [error curr-state]
+  (either (or (for [file (get-in error [.state .values 'file-name])
+                    line (get-in error [.state .values 'line-number])
+                    expr-line (get-in curr-state [.values 'line-number])]
+                (do
+                  (print-err (.msg error) " At" (str file ":") (str line ".")
+                             (cond (= line expr-line) ""
+                                   (str "\n In expression at line " (str expr-line "."))))))
+              (for [file (get-in error [.state .values 'file-name])
+                    expr-line (get-in curr-state [.values 'line-number])]
+                (print-err (.msg error) " At" (str file ":") (str expr-line "."))))
+          (print-err (.msg error)))
+  error)
+
 (def read-add-ns
   (grmr/rule
    "add-ns"
    (apply-to identity
              ignore-whitespace
              (grmr/catch-error
-              .state
+              output-error
               (apply-to identity
                         read-open-paren
                         (grmr/ignore "add-ns")
@@ -1423,7 +1437,7 @@
                        (apply-to identity
                                  ignore-whitespace
                                  (grmr/catch-error
-                                  .state
+                                  output-error
                                   (grmr/any read-defn
                                             read-def
                                             read-defprotocol
