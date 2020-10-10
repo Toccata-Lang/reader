@@ -11,11 +11,11 @@
 ;; The different types of nodes in the AST
 (add-ns ast (git-dependency "https://github.com/Toccata-Lang/ast.git"
                             "ast.toc"
-                            :sha "1870d56"))
+                            :sha "3e177ef"))
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
-                          :sha "4bede89"))
+                          :sha "75b9949"))
 
 (defn min [x y]
   (either (< x y)
@@ -448,9 +448,12 @@
   (assert (instance? c/ValueConstraint key-type))
   (assert (instance? c/ValueConstraint val-type))
 
-  (let [path (list [(ast/file-name key-type) (ast/line-number key-type)])]
-    (c/MultiConstraint [(c/KeysConstraint key-type path nothing "")
-                        (c/CollectionOf val-type path nothing "")])))
+  ;; TODO: put this back in when we decide how to use contraints with hash maps
+  ;; (let [path (list [(ast/file-name key-type) (ast/line-number key-type)])]
+  ;;   (c/MultiConstraint [(c/KeysConstraint key-type path nothing "")
+  ;;                       (c/CollectionOf val-type path nothing "")]))
+  c/top-type
+  )
 
 (def read-map-assertion
   (grmr/rule "assert-map-of"
@@ -507,7 +510,7 @@
    "promise-of" (c/TypeConstraint {c/PromiseType #{}} empty-list 'Promise  nothing "")
    "sequence-of" (c/TypeConstraint {c/ListType #{} c/VectorType #{}} empty-list 'Sequence nothing "")
    "function-returns" (c/TypeConstraint {c/FunctionType #{}} empty-list 'Fn nothing "")
-   "collection-of" c/top-type
+   "contains" c/top-type
    })
    ;; "future-of" 'Future
 
