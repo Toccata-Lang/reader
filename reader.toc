@@ -891,25 +891,27 @@
   (nest-let [body bindings]
     (ast/let-expr bindings [body]))
 
-  (nest-when [body clause zero-val]
+  (nest-when [body clause wrapper]
     (let [fn (ast/file-name clause)
           ln (ast/line-number clause)]
       (ast/cond-ast
        [(ast/cond-val-ast clause body)]
-       zero-val)))
+       (ast/call-ast (ast/tag 'zero fn ln)
+                     [wrapper]))))
 
-  (nest-when-not [body clause zero-val]
+  (nest-when-not [body clause wrapper]
     (let [fn (ast/file-name clause)
           ln (ast/line-number clause)]
       (ast/cond-ast
-       [(ast/cond-val-ast clause zero-val)]
+       [(ast/cond-val-ast clause (ast/call-ast (ast/tag 'zero fn ln)
+                                               [wrapper]))]
        body)))
 
-  (nest-binding [body binding zero-val]))
+  (nest-binding [body binding wrapper]))
 
 (extend-type ast/let-ast
   ForBinding
-  (nest-binding [body binding zero-val]
+  (nest-binding [body binding wrapper]
     (ast/call-ast (ast/tag 'flat-map (ast/file-name binding) (ast/line-number binding))
                   [(.val binding)
                    (ast/fn-expr nothing
@@ -918,7 +920,7 @@
 
 (extend-type ast/call-ast
   ForBinding
-  (nest-binding [body binding zero-val]
+  (nest-binding [body binding wrapper]
     (ast/call-ast (ast/tag 'flat-map (ast/file-name binding) (ast/line-number binding))
                   [(.val binding)
                    (ast/fn-expr nothing
@@ -927,7 +929,7 @@
 
 (extend-type ast/either-ast
   ForBinding
-  (nest-binding [body binding zero-val]
+  (nest-binding [body binding wrapper]
     (ast/call-ast (ast/tag 'flat-map (ast/file-name binding) (ast/line-number binding))
                   [(.val binding)
                    (ast/fn-expr nothing
@@ -936,7 +938,7 @@
 
 (extend-type ast/cond-ast
   ForBinding
-  (nest-binding [body binding zero-val]
+  (nest-binding [body binding wrapper]
     (ast/call-ast (ast/tag 'flat-map (ast/file-name binding) (ast/line-number binding))
                   [(.val binding)
                    (ast/fn-expr nothing
@@ -945,8 +947,8 @@
 
 (extend-type ast/binding-ast
   ForBinding
-  (nest-binding [b body zero-val]
-    (nest-binding body b zero-val)))
+  (nest-binding [b body wrapper]
+    (nest-binding body b wrapper)))
 
 (deftype ForLetExpr [bindings]
   (assert (instance? Vector bindings))
@@ -957,7 +959,7 @@
                          (list ">")))
 
   ForBinding
-  (nest-binding [_ body zero-val]
+  (nest-binding [_ body wrapper]
     (nest-let body bindings)))
 
 (def read-for-let
@@ -979,8 +981,8 @@
                          (list ">")))
 
   ForBinding
-  (nest-binding [_ body zero-val]
-    (nest-when body value zero-val)))
+  (nest-binding [_ body wrapper]
+    (nest-when body value wrapper)))
 
 (def read-for-when
   (grmr/rule "for-when"
@@ -998,8 +1000,8 @@
                          (list ">")))
 
   ForBinding
-  (nest-binding [_ body zero-val]
-    (nest-when-not body value zero-val)))
+  (nest-binding [_ body wrapper]
+    (nest-when-not body value wrapper)))
 
 (def read-for-when-not
   (grmr/rule "for-when-not"
@@ -1015,32 +1017,33 @@
   (nest-let [_ bindings]
     (ForResultExpr (nest-let body bindings)))
 
-  (nest-when [_ clause zero-val]
+  (nest-when [_ clause wrapper]
     (let [fn (ast/file-name clause)
           ln (ast/line-number clause)]
       (ast/call-ast
        (ast/tag 'flat-map fn ln)
        [(ast/cond-ast [(ast/cond-val-ast clause (ast/call-ast (ast/tag 'wrap fn ln)
-                                                               [zero-val body]))]
-                      zero-val)
+                                                               [wrapper body]))]
+                       (ast/call-ast (ast/tag 'zero fn ln)
+                                     [wrapper]))
         (ast/fn-expr nothing
                      [(ast/fn-arity (ast/params [(ast/tag "#x" fn ln)]) ""
                                     [(ast/call-ast (ast/tag 'wrap fn ln)
-                                                   [zero-val (ast/tag "#x" fn ln)])])])])))
+                                                   [wrapper (ast/tag "#x" fn ln)])])])])))
 
-  (nest-when-not [_ clause zero-val]
+  (nest-when-not [_ clause wrapper]
     (let [fn (ast/file-name clause)
           ln (ast/line-number clause)]
       (ast/call-ast
        (ast/tag 'flat-map fn ln)
-       [(ast/cond-ast [(ast/cond-val-ast clause zero-val)]
-                      (ast/call-ast (ast/tag 'wrap fn ln) [zero-val body]))
+       [(ast/cond-ast [(ast/cond-val-ast clause (ast/call-ast (ast/tag 'zero fn ln) [wrapper]))]
+                      (ast/call-ast (ast/tag 'wrap fn ln) [wrapper body]))
         (ast/fn-expr nothing
                      [(ast/fn-arity (ast/params [(ast/tag "#x" fn ln)]) ""
                                     [(ast/call-ast (ast/tag 'wrap fn ln)
-                                                   [zero-val (ast/tag "#x" fn ln)])])])])))
+                                                   [wrapper (ast/tag "#x" fn ln)])])])])))
 
-  (nest-binding [_ binding zero-val]
+  (nest-binding [_ binding wrapper]
     (let [fn (ast/file-name binding)
           ln (ast/line-number binding)]
       (ast/call-ast (ast/tag 'map fn ln)
@@ -1055,15 +1058,14 @@
                          (list ">"))))
 
 (defn nest-for-exprs [bogus bindings body]
-  (let [zero-val (ast/tag "#zero-val")]
-    (-> (list (ForLetExpr [(ast/binding zero-val (ast/call-ast (ast/tag 'zero)
-                                                               [(.val bogus)]))])
-              bogus)
+  (let [wrapper (ast/tag "#wrapper")]
+    (-> (list (ForLetExpr [(ast/binding wrapper (.val bogus))])
+              (ast/binding (.binding bogus) wrapper))
         (comp (remove bindings (partial instance? ast/NoCode)))
         reverse
         (reduce (ForResultExpr body)
                 (fn [body expr]
-                  (nest-binding expr body zero-val))))))
+                  (nest-binding expr body wrapper))))))
 
 (def read-for-binding
   (grmr/rule "for-binding"
