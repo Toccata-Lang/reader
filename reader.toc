@@ -15,7 +15,7 @@
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
-                          :sha "fda0215"))
+                          :sha "1c3ed7e"))
 
 (defn min [x y]
   (either (< x y)
