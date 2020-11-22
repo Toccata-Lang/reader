@@ -1192,7 +1192,7 @@
 
 (def read-def
   (grmr/rule "def"
-             (apply-to identity
+             (apply-to ast/annotated
                        read-open-paren
                        (grmr/ignore "def")
                        (grmr/ignore (grmr/one-or-more whitespace))
