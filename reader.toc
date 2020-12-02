@@ -11,11 +11,11 @@
 ;; The different types of nodes in the AST
 (add-ns ast (git-dependency "https://github.com/Toccata-Lang/ast.git"
                             "ast.toc"
-                            :sha "f9b7300"))
+                            :sha "7cdb4f5"))
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
-                          :sha "ba4f27d"))
+                          :sha "a0ce745"))
 
 (defn min [x y]
   (either (< x y)
@@ -448,12 +448,11 @@
   (assert (instance? c/ValueConstraint key-type))
   (assert (instance? c/ValueConstraint val-type))
 
-  ;; TODO: put this back in when we decide how to use contraints with hash maps
-  ;; (let [path (list [(ast/file-name key-type) (ast/line-number key-type)])]
-  ;;   (c/MultiConstraint [(c/KeysConstraint key-type path nothing "")
-  ;;                       (c/CollectionOf val-type path nothing "")]))
-  c/top-type
-  )
+  (let [path (list [(ast/file-name key-type) (ast/line-number key-type)])]
+    (c/CollectionOf (-> c/empty-items-constraint
+                        (.items-constraints [key-type val-type])
+                        (.tail-constraint c/top-type))
+                    path nothing "")))
 
 (def read-map-assertion
   (grmr/rule "assert-map-of"
@@ -1058,7 +1057,9 @@
                          (list ">"))))
 
 (defn nest-for-exprs [bogus bindings body]
-  (let [wrapper (ast/tag "#wrapper")]
+  (let [wrapper (ast/tag "#wrapper"
+                         (ast/file-name (.val bogus))
+                         (ast/line-number (.val bogus)))]
     (-> (list (ForLetExpr [(ast/binding wrapper (.val bogus))])
               (ast/binding (.binding bogus) wrapper))
         (comp (remove bindings (partial instance? ast/NoCode)))
