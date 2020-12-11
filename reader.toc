@@ -11,7 +11,7 @@
 ;; The different types of nodes in the AST
 (add-ns ast (git-dependency "https://github.com/Toccata-Lang/ast.git"
                             "ast.toc"
-                            :sha "4a23c6b"))
+                            :sha "4f9242f"))
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
@@ -1392,13 +1392,13 @@
                     line (get-in error [.state .values 'line-number])
                     expr-line (get-in curr-state [.values 'line-number])]
                 (do
-                  (print-err (.msg error) " At" (str file ":") (str line ".")
+                  (print-err (.val error) " At" (str file ":") (str line ".")
                              (cond (= line expr-line) ""
                                    (str "\n In expression at line " (str expr-line "."))))))
               (for [file (get-in error [.state .values 'file-name])
                     expr-line (get-in curr-state [.values 'line-number])]
-                (print-err (.msg error) " At" (str file ":") (str expr-line "."))))
-          (print-err (.msg error)))
+                (print-err (.val error) " At" (str file ":") (str expr-line "."))))
+          (print-err (.val error)))
   error)
 
 (def read-add-ns
