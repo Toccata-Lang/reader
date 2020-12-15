@@ -11,7 +11,7 @@
 ;; The different types of nodes in the AST
 (add-ns ast (git-dependency "https://github.com/Toccata-Lang/ast.git"
                             "ast.toc"
-                            :sha "4f9242f"))
+                            :sha "d62a48d"))
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
@@ -715,7 +715,9 @@
 
 (def read-implementation
   (grmr/rule "protocol-implementation"
-             (apply-to hash-map
+             (apply-to (fn [fn-sym arities]
+                         {fn-sym (map arities (fn [arity]
+                                                (.fn-sym arity fn-sym)))})
                        read-open-paren
                        (grmr/any read-symbol
                                  (grmr/error "A prototype function implementation must have a name."))
