@@ -11,11 +11,11 @@
 ;; The different types of nodes in the AST
 (add-ns ast (git-dependency "https://github.com/Toccata-Lang/ast.git"
                             "ast.toc"
-                            :sha "d62a48d"))
+                            :sha "ca7e20c"))
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
-                          :sha "dd8f917"))
+                          :sha "db280f6"))
 
 (defn min [x y]
   (either (< x y)
