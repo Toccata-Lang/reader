@@ -11,11 +11,11 @@
 ;; The different types of nodes in the AST
 (add-ns ast (git-dependency "https://github.com/Toccata-Lang/ast.git"
                             "ast.toc"
-                            :sha "771afde"))
+                            :sha "a57aa31"))
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
-                          :sha "7f5f8de"))
+                          :sha "de79052"))
 
 (defn min [x y]
   (either (< x y)
@@ -404,8 +404,9 @@
                        read-close-paren)))
 
 (defn assert-max-value [file-name line-number max]
-  (c/MaxValue max (list [file-name line-number])
-              nothing ""))
+  (-> c/int-constraint
+      (assoc-in [.type-maps c/IntegerType c/max-value] max)
+      (c/update-path file-name line-number)))
 
 (def read-max-val-assertion
   (grmr/rule "assert-max"
@@ -421,8 +422,9 @@
                        read-close-paren)))
 
 (defn assert-min-value [file-name line-number min]
-  (c/MinValue min (list [file-name line-number])
-              nothing ""))
+  (-> c/int-constraint
+      (assoc-in [.type-maps c/IntegerType c/min-value] min)
+      (c/update-path file-name line-number)))
 
 (def read-min-val-assertion
   (grmr/rule "assert-min"
@@ -441,8 +443,9 @@
   (grmr/recurse "type-expr"))
 
 (defn assert-type [type-sym]
-  (c/TypeConstraint {} (list [(ast/file-name type-sym) (ast/line-number type-sym)])
-                    type-sym nothing ""))
+  (-> (either (get c/core-type-constraints type-sym)
+              (c/TypeConstraint {} empty-list type-sym nothing ""))
+      (c/update-path (ast/file-name type-sym) (ast/line-number type-sym))))
 
 (defn assert-map-of [key-type val-type]
   (assert (instance? c/ValueConstraint key-type))
