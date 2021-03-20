@@ -11,11 +11,11 @@
 ;; The different types of nodes in the AST
 (add-ns ast (git-dependency "https://github.com/Toccata-Lang/ast.git"
                             "ast.toc"
-                            :sha "a57aa31"))
+                            :sha "6f0dd27"))
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
-                          :sha "de79052"))
+                          :sha "4227f66"))
 
 (defn min [x y]
   (either (< x y)
@@ -451,11 +451,13 @@
   (assert (instance? c/ValueConstraint key-type))
   (assert (instance? c/ValueConstraint val-type))
 
-  (let [path (list [(ast/file-name key-type) (ast/line-number key-type)])]
-    (c/CollectionOf (-> c/empty-items-constraint
-                        (.items-constraints [key-type val-type])
-                        (.tail-constraint c/top-type))
-                    path nothing "")))
+  (let [kv-map {c/map-keys key-type
+                c/map-values val-type}]
+    (-> c/hashmap-constraint
+        (assoc-in [.type-maps c/BitmapIndexedType] kv-map)
+        (assoc-in [.type-maps c/ArrayNodeType] kv-map)
+        (assoc-in [.type-maps c/HashCollisionNodeType] kv-map)
+        (c/update-path (ast/file-name key-type) (ast/line-number key-type)))))
 
 (def read-map-assertion
   (grmr/rule "assert-map-of"
