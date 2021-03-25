@@ -11,11 +11,11 @@
 ;; The different types of nodes in the AST
 (add-ns ast (git-dependency "https://github.com/Toccata-Lang/ast.git"
                             "ast.toc"
-                            :sha "4cdda47"))
+                            :sha "1960300"))
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
-                          :sha "c3bb933"))
+                          :sha "ab2c3d0"))
 
 (defn min [x y]
   (either (< x y)
@@ -405,7 +405,7 @@
 
 (defn assert-max-value [file-name line-number max]
   (-> c/int-constraint
-      (assoc-in [.type-maps c/IntegerType c/max-value] max)
+      (.max max)
       (c/update-path file-name line-number)))
 
 (def read-max-val-assertion
@@ -423,7 +423,7 @@
 
 (defn assert-min-value [file-name line-number min]
   (-> c/int-constraint
-      (assoc-in [.type-maps c/IntegerType c/min-value] min)
+      (.min min)
       (c/update-path file-name line-number)))
 
 (def read-min-val-assertion
