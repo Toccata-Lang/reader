@@ -11,11 +11,11 @@
 ;; The different types of nodes in the AST
 (add-ns ast (git-dependency "https://github.com/Toccata-Lang/ast.git"
                             "ast.toc"
-                            :sha "1960300"))
+                            :sha "75a775e"))
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
-                          :sha "ab2c3d0"))
+                          :sha "c8076d1"))
 
 (defn min [x y]
   (either (< x y)
@@ -451,13 +451,15 @@
   (assert (instance? c/ValueConstraint key-type))
   (assert (instance? c/ValueConstraint val-type))
 
-  (let [kv-map {c/map-keys key-type
-                c/map-values val-type}]
-    (-> c/hashmap-constraint
-        (assoc-in [.type-maps c/BitmapIndexedType] kv-map)
-        (assoc-in [.type-maps c/ArrayNodeType] kv-map)
-        (assoc-in [.type-maps c/HashCollisionNodeType] kv-map)
-        (c/update-path (ast/file-name key-type) (ast/line-number key-type)))))
+  (-> (cata (fn [c]
+              (cond (instance? c/HashMapConstraint c)
+                    (-> c
+                        (.keys-c key-type)
+                        (.vals-c val-type))
+
+                    c))
+            c/hashmap-constraint)
+      (c/update-path (ast/file-name key-type) (ast/line-number key-type))))
 
 (def read-map-assertion
   (grmr/rule "assert-map-of"
@@ -514,7 +516,6 @@
    "promise-of" c/promise-constraint
    "sequence-of" c/seq-constraint
    "function-returns" c/fn-constraint
-   "contains" c/top-type
    })
    ;; "future-of" 'Future
 
