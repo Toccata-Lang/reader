@@ -11,11 +11,11 @@
 ;; The different types of nodes in the AST
 (add-ns ast (git-dependency "https://github.com/Toccata-Lang/ast.git"
                             "ast.toc"
-                            :sha "241810e"))
+                            :sha "90be434"))
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
-                          :sha "a8b3543"))
+                          :sha "601dd1f"))
 
 (defn min [x y]
   (either (< x y)
@@ -384,10 +384,31 @@
                                  (grmr/error "Missing 'cond' default clause."))
                        read-close-paren)))
 
+(def ListOrVect (any-of c/VectorConstraint
+                        c/ListConstraint))
+
+(defn set-items [c items]
+  (apo (fn [c]
+         (cond (instance? ListOrVect c)
+               (Left (.items c items))
+
+               (Right c)))
+       c))
+
+(defn set-tail [c tail]
+  (apo (fn [c]
+         (cond (instance? ListOrVect c)
+               (Left (.tail-c c tail))
+
+               (Right c)))
+       c))
+
 (defn assert-min-count [file-name line-number len]
   ;; TODO: what was I thinking doing it this way. (Actually, I know.)
-  (c/ItemsConstraint (repeat len c/top-type) c/coll-of-any
-                     (list [file-name line-number]) nothing ""))
+  (-> c/seq-constraint
+      (set-items (repeat len c/top-type))
+      (set-tail c/coll-of-any)
+      (c/update-path file-name line-number)))
 
 (def read-min-count-assertion
   (grmr/rule "assert-min-count"
