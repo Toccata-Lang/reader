@@ -11,11 +11,11 @@
 ;; The different types of nodes in the AST
 (add-ns ast (git-dependency "https://github.com/Toccata-Lang/ast.git"
                             "ast.toc"
-                            :sha "e0d02c8"))
+                            :sha "8f8bd19"))
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
-                          :sha "4b43dee"))
+                          :sha "a65f9f4"))
 
 (defn min [x y]
   (either (< x y)
@@ -538,7 +538,6 @@
    "sequence-of" c/seq-constraint
    "function-returns" c/fn-constraint
    })
-   ;; "future-of" 'Future
 
 (def read-generic-type
   (grmr/rule "generic-type"
