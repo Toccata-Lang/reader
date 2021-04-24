@@ -11,11 +11,11 @@
 ;; The different types of nodes in the AST
 (add-ns ast (git-dependency "https://github.com/Toccata-Lang/ast.git"
                             "ast.toc"
-                            :sha "ec6f1be"))
+                            :sha "e56b5a7"))
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
-                          :sha "336671d"))
+                          :sha "0343e1c"))
 
 (defn min [x y]
   (either (< x y)
@@ -499,7 +499,7 @@
 (def read-multi-type
   (grmr/rule "multi-type"
              (apply-to (fn [type-exprs]
-                         (c/trim (c/MultiConstraint type-exprs)))
+                         (c/trim (reduce type-exprs c/top-type c/intersect)))
                        read-open-paren
                        ignore-whitespace
                        (grmr/ignore "all-of")
@@ -513,7 +513,7 @@
 
   (c/SumConstraint type-exprs
                    (list [file line])
-                   (maybe (symbol "")) ""))
+                   (symbol "") ""))
 
 (def read-sum-type
   (grmr/rule "sum-type"
@@ -547,7 +547,7 @@
                                        (print-err "No generic type" (str "'" base-string "'")
                                                   "exists. At" file ": " line)
                                        (abort)))
-                             (c/intersect (c/CollectionOf contents-type empty-list nothing ""))
+                             (c/intersect (c/CollectionOf contents-type empty-list c/no-symbol ""))
                              (c/update-path file line)))
                        read-open-paren
                        ignore-whitespace
