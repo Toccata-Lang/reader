@@ -11,11 +11,11 @@
 ;; The different types of nodes in the AST
 (add-ns ast (git-dependency "https://github.com/Toccata-Lang/ast.git"
                             "ast.toc"
-                            :sha "9ebfd68"))
+                            :sha "611c918"))
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
-                          :sha "3458d01"))
+                          :sha "28d1365"))
 
 (defn min [x y]
   (either (< x y)
@@ -465,7 +465,7 @@
 
 (defn assert-type [type-sym]
   (-> (either (get c/core-type-constraints type-sym)
-              (c/ReifiedConstraint c/UnknownType {} type-sym empty-list c/no-symbol ""))
+              (c/ReifiedConstraint c/UnknownType {} (ast/untag type-sym) empty-list c/no-symbol ""))
       (c/update-path (ast/file-name type-sym) (ast/line-number type-sym))))
 
 (defn assert-map-of [key-type val-type]
