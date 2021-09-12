@@ -11,11 +11,11 @@
 ;; The different types of nodes in the AST
 (add-ns ast (git-dependency "https://github.com/Toccata-Lang/ast.git"
                             "ast.toc"
-                            :sha "72f24e9"))
+                            :sha "b336ed0"))
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
-                          :sha "b7c19ca"))
+                          :sha "789d3d7"))
 
 (defn min [x y]
   (either (< x y)
@@ -539,6 +539,21 @@
    "function-returns" c/fn-constraint
    })
 
+(def read-type-of-type
+  (grmr/rule "type-of"
+             (apply-to (fn [file line sym]
+                         (-> c/type-of-constraint
+                             (.sym (ast/untag sym))
+                             (c/update-path file line)))
+                       read-open-paren
+                       ignore-whitespace
+                       (grmr/ignore "type-of")
+                       (grmr/get-value 'file-name)
+                       (grmr/get-value 'line-number)
+                       ignore-whitespace
+                       read-symbol
+                       read-close-paren)))
+
 (def read-generic-type
   (grmr/rule "generic-type"
              (apply-to (fn [base-string file line contents-type]
@@ -554,7 +569,8 @@
                        (apply grmr/any (keys generic-assertions))
                        (grmr/get-value 'file-name)
                        (grmr/get-value 'line-number)
-                       read-sub-type
+                       (grmr/any read-sub-type
+                                 read-type-of-type)
                        read-close-paren)))
 
 (def read-type-expr
