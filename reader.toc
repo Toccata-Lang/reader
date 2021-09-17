@@ -11,11 +11,11 @@
 ;; The different types of nodes in the AST
 (add-ns ast (git-dependency "https://github.com/Toccata-Lang/ast.git"
                             "ast.toc"
-                            :sha "b336ed0"))
+                            :sha "c17e49a"))
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
-                          :sha "789d3d7"))
+                          :sha "ab07c53"))
 
 (defn min [x y]
   (either (< x y)
@@ -25,10 +25,8 @@
 (defn debug [tag]
   (grmr/ignore
    (apply-to (fn [file text]
-               (cond
-                (= 'core file) 0
-                (print-err tag (count text)
-                           (str "\"" (subs text 0 (min 40 (count text))) "\""))))
+               (print-err tag (count text)
+                          (str "\"" (subs text 0 (min 40 (count text))) "\"")))
              (grmr/get-value 'file-name)
              grmr/get-text)))
 
@@ -539,6 +537,21 @@
    "function-returns" c/fn-constraint
    })
 
+(def read-inner-type-of-type
+  (grmr/rule "inner-type-of"
+             (apply-to (fn [file line sym]
+                         (-> c/inner-type-of-constraint
+                             (.param-sym sym)
+                             (c/update-path file line)))
+                       read-open-paren
+                       ignore-whitespace
+                       (grmr/ignore "inner-type-of")
+                       (grmr/get-value 'file-name)
+                       (grmr/get-value 'line-number)
+                       ignore-whitespace
+                       read-symbol
+                       read-close-paren)))
+
 (def read-type-of-type
   (grmr/rule "type-of"
              (apply-to (fn [file line sym]
@@ -595,6 +608,7 @@
                        (grmr/ignore "instance?")
                        (grmr/ignore (grmr/one-or-more whitespace))
                        (grmr/any read-type-expr
+                                 read-inner-type-of-type
                                  (grmr/error "Ivalid type expression"))
                        (grmr/ignore (grmr/one-or-more whitespace))
                        (grmr/any read-symbol
