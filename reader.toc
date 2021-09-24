@@ -11,11 +11,11 @@
 ;; The different types of nodes in the AST
 (add-ns ast (git-dependency "https://github.com/Toccata-Lang/ast.git"
                             "ast.toc"
-                            :sha "fb1cfce"))
+                            :sha "26bb346"))
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
-                          :sha "5ad42dc"))
+                          :sha "a0b3e82"))
 
 (defn min [x y]
   (either (< x y)
@@ -556,7 +556,7 @@
   (grmr/rule "type-of"
              (apply-to (fn [file line sym]
                          (-> c/type-of-constraint
-                             (.sym (ast/untag sym))
+                             (.param-sym (ast/untag sym))
                              (c/update-path file line)))
                        read-open-paren
                        ignore-whitespace
@@ -583,7 +583,22 @@
                        (grmr/get-value 'file-name)
                        (grmr/get-value 'line-number)
                        (grmr/any read-sub-type
+                                 read-inner-type-of-type
                                  read-type-of-type)
+                       read-close-paren)))
+
+(def read-show-type
+  (grmr/rule "show-type"
+             (apply-to (fn [file line sym]
+                         (-> (c/DebugConstraint c/top-type empty-list (ast/untag sym) "")
+                             (c/update-path file line)))
+                       read-open-paren
+                       ignore-whitespace
+                       (grmr/ignore "show-type")
+                       (grmr/get-value 'file-name)
+                       (grmr/get-value 'line-number)
+                       ignore-whitespace
+                       read-symbol
                        read-close-paren)))
 
 (def read-type-expr
@@ -592,6 +607,7 @@
                                  read-multi-type
                                  read-map-assertion
                                  read-generic-type
+                                 read-type-of-type
                                  read-min-count-assertion
                                  read-min-val-assertion
                                  read-max-val-assertion
@@ -622,6 +638,7 @@
                        (grmr/ignore "assert")
                        (grmr/ignore (grmr/one-or-more whitespace))
                        (grmr/any read-type-assertion
+                                 read-show-type
                                  (grmr/error "Missing type assertion in 'assert' expression."))
                        read-close-paren)))
 
@@ -635,6 +652,7 @@
                        (grmr/ignore (grmr/optional read-symbol))
                        (grmr/ignore (grmr/one-or-more whitespace))
                        (grmr/any read-type-assertion
+                                 read-show-type
                                  (grmr/error "Missing type assertion in 'assert-result' expression."))
                        read-close-paren)))
 
