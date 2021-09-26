@@ -11,11 +11,11 @@
 ;; The different types of nodes in the AST
 (add-ns ast (git-dependency "https://github.com/Toccata-Lang/ast.git"
                             "ast.toc"
-                            :sha "bddb686"))
+                            :sha "0debb61"))
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
-                          :sha "490808e"))
+                          :sha "7240c55"))
 
 (defn min [x y]
   (either (< x y)
@@ -461,11 +461,6 @@
 (def read-sub-type
   (grmr/recurse "type-expr"))
 
-(defn assert-type [type-sym]
-  (-> (either (get c/core-type-constraints type-sym)
-              (c/ReifiedConstraint c/UnknownType {} (ast/untag type-sym) {} empty-list c/no-symbol ""))
-      (c/update-path (ast/file-name type-sym) (ast/line-number type-sym))))
-
 (defn assert-map-of [key-type val-type]
   (assert (instance? c/ValueConstraint key-type))
   (assert (instance? c/ValueConstraint val-type))
@@ -600,6 +595,11 @@
                        ignore-whitespace
                        read-symbol
                        read-close-paren)))
+
+(defn assert-type [type-sym]
+   (-> (either (get c/core-type-constraints type-sym)
+              (c/ReifiedConstraint c/UnknownType {} (ast/untag type-sym) {} empty-list c/no-symbol ""))
+      (c/update-path (ast/file-name type-sym) (ast/line-number type-sym))))
 
 (def read-type-expr
   (grmr/recursive-rule "type-expr"
