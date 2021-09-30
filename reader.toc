@@ -11,11 +11,11 @@
 ;; The different types of nodes in the AST
 (add-ns ast (git-dependency "https://github.com/Toccata-Lang/ast.git"
                             "ast.toc"
-                            :sha "e9c6749"))
+                            :sha "b862ee3"))
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
-                          :sha "2ab489f"))
+                          :sha "a860ea9"))
 
 (defn min [x y]
   (either (< x y)
@@ -461,66 +461,6 @@
 (def read-sub-type
   (grmr/recurse "type-expr"))
 
-(defn assert-map-of [key-type val-type]
-  (assert (instance? c/ValueConstraint key-type))
-  (assert (instance? c/ValueConstraint val-type))
-
-  (-> (cata (fn [c]
-              (cond (instance? c/HashMapConstraint c)
-                    (-> c
-                        (.keys-c key-type)
-                        (.vals-c val-type))
-
-                    c))
-            c/hashmap-constraint)
-      (c/update-path (ast/file-name key-type) (ast/line-number key-type))))
-
-(def read-map-assertion
-  (grmr/rule "assert-map-of"
-             (apply-to assert-map-of
-                       read-open-paren
-                       ignore-whitespace
-                       (grmr/ignore "map-of")
-                       (grmr/ignore (grmr/one-or-more whitespace))
-                       read-sub-type
-                       (grmr/ignore (grmr/one-or-more whitespace))
-                       (grmr/any read-sub-type
-                                 (grmr/error "The 'map-of' expression must contain one type expression"
-                                             "for the key values and one for the mapped values."))
-                       read-close-paren)))
-
-(def read-multi-type
-  (grmr/rule "multi-type"
-             (apply-to (fn [type-exprs]
-                         (c/trim (reduce type-exprs c/top-type c/intersect)))
-                       read-open-paren
-                       ignore-whitespace
-                       (grmr/ignore "all-of")
-                       (grmr/any (grmr/one-or-more read-sub-type)
-                                 (grmr/error "The 'all-of' expression must contain at least one"
-                                             "type expression."))
-                       read-close-paren)))
-
-(defn make-any-of [file line type-exprs]
-  (assert (instance? (vector-of c/ValueConstraint) type-exprs))
-
-  (c/SumConstraint type-exprs
-                   (list [file line])
-                   (symbol "") ""))
-
-(def read-sum-type
-  (grmr/rule "sum-type"
-             (apply-to make-any-of
-                       read-open-paren
-                       ignore-whitespace
-                       (grmr/ignore "any-of")
-                       (grmr/get-value 'file-name)
-                       (grmr/get-value 'line-number)
-                       (grmr/any (grmr/one-or-more read-sub-type)
-                                 (grmr/error "The 'any-of' expression must contain at least one"
-                                             "type expression."))
-                       read-close-paren)))
-
 (def generic-assertions
   {"vector-of" c/vect-constraint
    "list-of" c/list-constraint
@@ -560,6 +500,70 @@
                        (grmr/get-value 'line-number)
                        ignore-whitespace
                        read-symbol
+                       read-close-paren)))
+
+(defn assert-map-of [key-type val-type]
+  (assert (instance? c/ValueConstraint key-type))
+  (assert (instance? c/ValueConstraint val-type))
+
+  (-> (cata (fn [c]
+              (cond (instance? c/HashMapConstraint c)
+                    (-> c
+                        (.keys-c key-type)
+                        (.vals-c val-type))
+
+                    c))
+            c/hashmap-constraint)
+      (c/update-path (ast/file-name key-type) (ast/line-number key-type))))
+
+(def read-map-assertion
+  (grmr/rule "assert-map-of"
+             (apply-to assert-map-of
+                       read-open-paren
+                       ignore-whitespace
+                       (grmr/ignore "map-of")
+                       (grmr/ignore (grmr/one-or-more whitespace))
+                       read-sub-type
+                       (grmr/ignore (grmr/one-or-more whitespace))
+                       (grmr/any read-sub-type
+                                 (grmr/error "The 'map-of' expression must contain one type expression"
+                                             "for the key values and one for the mapped values."))
+                       read-close-paren)))
+
+(def read-multi-type
+  (grmr/rule "multi-type"
+             (apply-to (fn [type-exprs]
+                         (c/trim (reduce type-exprs c/top-type c/intersect)))
+                       read-open-paren
+                       ignore-whitespace
+                       (grmr/ignore "all-of")
+                       (grmr/any (grmr/one-or-more (grmr/any read-sub-type
+                                                             read-inner-type-of-type
+                                                             read-type-of-type))
+                                 (grmr/error "The 'all-of' expression must contain at least one"
+                                             "type expression."))
+                       read-close-paren)))
+
+(defn make-any-of [file line type-exprs]
+  (assert (instance? (vector-of c/ValueConstraint) type-exprs))
+
+  (c/SumConstraint type-exprs
+                   (list [file line])
+                   (symbol "") ""))
+
+(def read-sum-type
+  (grmr/rule "sum-type"
+             (apply-to make-any-of
+                       read-open-paren
+                       ignore-whitespace
+                       (grmr/ignore "any-of")
+                       (grmr/get-value 'file-name)
+                       (grmr/get-value 'line-number)
+                       (grmr/any (grmr/one-or-more (grmr/any read-sub-type
+                                                             read-inner-type-of-type
+                                                             read-type-of-type))
+                                 (grmr/error "The 'any-of' expression must contain at least one"
+                                             "type expression."))
                        read-close-paren)))
 
 (def read-generic-type
