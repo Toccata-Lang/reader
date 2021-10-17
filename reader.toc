@@ -592,7 +592,7 @@
                          (-> c/list-constraint
                              (.items (either items-types
                                              []))
-                             (.tail-c tail-type)
+                             (.tail-c (c/CollectionOf tail-type empty-list c/no-symbol ""))
                              (c/update-path file line)))
                        read-open-paren
                        ignore-whitespace
