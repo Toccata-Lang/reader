@@ -11,11 +11,11 @@
 ;; The different types of nodes in the AST
 (add-ns ast (git-dependency "https://github.com/Toccata-Lang/ast.git"
                             "ast.toc"
-                            :sha "148a7d8"))
+                            :sha "73a3c84"))
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
-                          :sha "9670071"))
+                          :sha "36eb309"))
 
 (defn min [x y]
   (either (< x y)
@@ -612,6 +612,36 @@
                                  read-type-of-type)
                        read-close-paren)))
 
+(def read-vector-from
+  (grmr/rule "vector-from"
+             (apply-to (fn [file line sym]
+                         (-> c/vect-constraint
+                             (c/SetCollectionType (ast/untag sym) empty-list c/no-symbol "")
+                             (c/update-path file line)))
+                       read-open-paren
+                       ignore-whitespace
+                       (grmr/ignore "vector-from")
+                       (grmr/get-value 'file-name)
+                       (grmr/get-value 'line-number)
+                       ignore-whitespace
+                       read-symbol
+                       read-close-paren)))
+
+(def read-list-from
+  (grmr/rule "list-from"
+             (apply-to (fn [file line sym]
+                         (-> c/list-constraint
+                             (c/SetCollectionType (ast/untag sym) empty-list c/no-symbol "")
+                             (c/update-path file line)))
+                       read-open-paren
+                       ignore-whitespace
+                       (grmr/ignore "list-from")
+                       (grmr/get-value 'file-name)
+                       (grmr/get-value 'line-number)
+                       ignore-whitespace
+                       read-symbol
+                       read-close-paren)))
+
 (def read-show-type
   (grmr/rule "show-type"
              (apply-to (fn [file line sym]
@@ -684,6 +714,8 @@
                        (grmr/ignore (grmr/one-or-more whitespace))
                        (grmr/any read-type-assertion
                                  read-show-type
+                                 read-vector-from
+                                 read-list-from
                                  (grmr/error "Missing type assertion in 'assert-result' expression."))
                        read-close-paren)))
 
