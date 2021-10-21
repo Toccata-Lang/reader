@@ -11,11 +11,11 @@
 ;; The different types of nodes in the AST
 (add-ns ast (git-dependency "https://github.com/Toccata-Lang/ast.git"
                             "ast.toc"
-                            :sha "73a3c84"))
+                            :sha "3e56afe"))
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
-                          :sha "36eb309"))
+                          :sha "40e5e8e"))
 
 (defn min [x y]
   (either (< x y)
@@ -462,16 +462,6 @@
 (def read-sub-type
   (grmr/recurse "type-expr"))
 
-(def generic-assertions
-  {"vector-of" c/vect-constraint
-   "maybe-of" c/maybe-constraint
-   "set-of" c/set-constraint
-   "agent-of" c/agent-constraint
-   "promise-of" c/promise-constraint
-   "sequence-of" c/seq-constraint
-   "function-returns" c/fn-constraint
-   })
-
 (def read-inner-type-of-type
   (grmr/rule "inner-type-of"
              (apply-to (fn [file line sym]
@@ -566,6 +556,16 @@
                                              "type expression."))
                        read-close-paren)))
 
+(def generic-assertions
+  {"vector-of" c/vect-constraint
+   "maybe-of" c/maybe-constraint
+   "set-of" c/set-constraint
+   "agent-of" c/agent-constraint
+   "promise-of" c/promise-constraint
+   "sequence-of" c/seq-constraint
+   "function-returns" c/fn-constraint
+   })
+
 (def read-generic-type
   (grmr/rule "generic-type"
              (apply-to (fn [base-string file line contents-type]
@@ -612,30 +612,24 @@
                                  read-type-of-type)
                        read-close-paren)))
 
-(def read-vector-from
-  (grmr/rule "vector-from"
-             (apply-to (fn [file line sym]
-                         (-> c/vect-constraint
-                             (c/SetCollectionType (ast/untag sym) empty-list c/no-symbol "")
-                             (c/update-path file line)))
-                       read-open-paren
-                       ignore-whitespace
-                       (grmr/ignore "vector-from")
-                       (grmr/get-value 'file-name)
-                       (grmr/get-value 'line-number)
-                       ignore-whitespace
-                       read-symbol
-                       read-close-paren)))
+(def seq-assertions
+  {"vector-from" c/VectFrom
+   "list-from" c/ListFrom
+   })
 
-(def read-list-from
-  (grmr/rule "list-from"
-             (apply-to (fn [file line sym]
-                         (-> c/list-constraint
-                             (c/SetCollectionType (ast/untag sym) empty-list c/no-symbol "")
+(def read-seq-type
+  (grmr/rule "seq-type"
+             (apply-to (fn [base-string file line base-sym]
+                         (-> (either (get seq-assertions base-string)
+                                     (fn [_]
+                                       (print-err "No modified sequence type" (str "'" base-string "'")
+                                                  "exists. At" file ": " line)
+                                       (abort)))
+                             (c/ModSeqType (ast/untag base-sym) empty-list c/no-symbol "")
                              (c/update-path file line)))
                        read-open-paren
                        ignore-whitespace
-                       (grmr/ignore "list-from")
+                       (apply grmr/any (keys seq-assertions))
                        (grmr/get-value 'file-name)
                        (grmr/get-value 'line-number)
                        ignore-whitespace
@@ -714,8 +708,7 @@
                        (grmr/ignore (grmr/one-or-more whitespace))
                        (grmr/any read-type-assertion
                                  read-show-type
-                                 read-vector-from
-                                 read-list-from
+                                 read-seq-type
                                  (grmr/error "Missing type assertion in 'assert-result' expression."))
                        read-close-paren)))
 
