@@ -11,11 +11,11 @@
 ;; The different types of nodes in the AST
 (add-ns ast (git-dependency "https://github.com/Toccata-Lang/ast.git"
                             "ast.toc"
-                            :sha "3e56afe"))
+                            :sha "30ea16a"))
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
-                          :sha "40e5e8e"))
+                          :sha "3c94753"))
 
 (defn min [x y]
   (either (< x y)
@@ -615,6 +615,8 @@
 (def seq-assertions
   {"vector-from" c/VectFrom
    "list-from" c/ListFrom
+   "rest-of" c/RestOf
+   "butlast-of" c/ButLastOf
    })
 
 (def read-seq-type
