@@ -11,11 +11,11 @@
 ;; The different types of nodes in the AST
 (add-ns ast (git-dependency "https://github.com/Toccata-Lang/ast.git"
                             "ast.toc"
-                            :sha "fb8cccd"))
+                            :sha "0eb90c0"))
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
-                          :sha "67ba38b"))
+                          :sha "6184ccb"))
 
 (defn min [x y]
   (either (< x y)
@@ -492,6 +492,22 @@
                        read-symbol
                        read-close-paren)))
 
+(def read-type-of-arg-type
+  (grmr/rule "type-of-arg"
+             (apply-to (fn [file line sym arg-pos]
+                         (-> (c/ArgOf (ast/untag sym) (.int arg-pos) empty-list c/no-symbol "")
+                             (c/update-path file line)))
+                       read-open-paren
+                       ignore-whitespace
+                       (grmr/ignore "type-of-arg")
+                       (grmr/get-value 'file-name)
+                       (grmr/get-value 'line-number)
+                       ignore-whitespace
+                       read-symbol
+                       ignore-whitespace
+                       read-integer-literal
+                       read-close-paren)))
+
 (defn assert-map-of [key-type val-type]
   (assert (instance? c/ValueConstraint key-type))
   (assert (instance? c/ValueConstraint val-type))
@@ -529,6 +545,7 @@
                        (grmr/ignore "all-of")
                        (grmr/any (grmr/one-or-more (grmr/any read-sub-type
                                                              read-inner-type-of-type
+                                                             read-type-of-arg-type
                                                              read-type-of-type))
                                  (grmr/error "The 'all-of' expression must contain at least one"
                                              "type expression."))
@@ -551,6 +568,7 @@
                        (grmr/get-value 'line-number)
                        (grmr/any (grmr/one-or-more (grmr/any read-sub-type
                                                              read-inner-type-of-type
+                                                             read-type-of-arg-type
                                                              read-type-of-type))
                                  (grmr/error "The 'any-of' expression must contain at least one"
                                              "type expression."))
@@ -583,6 +601,7 @@
                        (grmr/get-value 'line-number)
                        (grmr/any read-sub-type
                                  read-inner-type-of-type
+                                 read-type-of-arg-type
                                  read-type-of-type)
                        read-close-paren)))
 
@@ -605,10 +624,12 @@
                                                 (grmr/ignore "[")
                                                 (grmr/one-or-more (grmr/any read-sub-type
                                                                             read-inner-type-of-type
+                                                                            read-type-of-arg-type
                                                                             read-type-of-type))
                                                 read-close-bracket))
                        (grmr/any read-sub-type
                                  read-inner-type-of-type
+                                 read-type-of-arg-type
                                  read-type-of-type)
                        read-close-paren)))
 
@@ -665,6 +686,7 @@
                                  read-map-assertion
                                  read-list-of
                                  read-generic-type
+                                 read-type-of-arg-type
                                  read-type-of-type
                                  read-min-count-assertion
                                  read-min-val-assertion
