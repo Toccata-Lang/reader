@@ -11,11 +11,11 @@
 ;; The different types of nodes in the AST
 (add-ns ast (git-dependency "https://github.com/Toccata-Lang/ast.git"
                             "ast.toc"
-                            :sha "783c403"))
+                            :sha "f854f65"))
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
-                          :sha "559a4ed"))
+                          :sha "6ee9b41"))
 
 (defn min [x y]
   (either (< x y)
@@ -508,6 +508,20 @@
                        read-integer-literal
                        read-close-paren)))
 
+(def read-type-of-result-type
+  (grmr/rule "type-of-result"
+             (apply-to (fn [file line sym]
+                         (-> (c/ResultOf (ast/untag sym) empty-list c/no-symbol "")
+                             (c/update-path file line)))
+                       read-open-paren
+                       ignore-whitespace
+                       (grmr/ignore "type-of-result")
+                       (grmr/get-value 'file-name)
+                       (grmr/get-value 'line-number)
+                       ignore-whitespace
+                       read-symbol
+                       read-close-paren)))
+
 (defn assert-map-of [key-type val-type]
   (assert (instance? c/ValueConstraint key-type))
   (assert (instance? c/ValueConstraint val-type))
@@ -546,6 +560,7 @@
                        (grmr/any (grmr/one-or-more (grmr/any read-sub-type
                                                              read-inner-type-of-type
                                                              read-type-of-arg-type
+                                                             read-type-of-result-type
                                                              read-type-of-type))
                                  (grmr/error "The 'all-of' expression must contain at least one"
                                              "type expression."))
@@ -569,6 +584,7 @@
                        (grmr/any (grmr/one-or-more (grmr/any read-sub-type
                                                              read-inner-type-of-type
                                                              read-type-of-arg-type
+                                                             read-type-of-result-type
                                                              read-type-of-type))
                                  (grmr/error "The 'any-of' expression must contain at least one"
                                              "type expression."))
@@ -602,6 +618,7 @@
                        (grmr/any read-sub-type
                                  read-inner-type-of-type
                                  read-type-of-arg-type
+                                 read-type-of-result-type
                                  read-type-of-type)
                        read-close-paren)))
 
@@ -625,11 +642,13 @@
                                                 (grmr/one-or-more (grmr/any read-sub-type
                                                                             read-inner-type-of-type
                                                                             read-type-of-arg-type
+                                                                            read-type-of-result-type
                                                                             read-type-of-type))
                                                 read-close-bracket))
                        (grmr/any read-sub-type
                                  read-inner-type-of-type
                                  read-type-of-arg-type
+                                 read-type-of-result-type
                                  read-type-of-type)
                        read-close-paren)))
 
@@ -687,6 +706,7 @@
                                  read-list-of
                                  read-generic-type
                                  read-type-of-arg-type
+                                 read-type-of-result-type
                                  read-type-of-type
                                  read-min-count-assertion
                                  read-min-val-assertion
