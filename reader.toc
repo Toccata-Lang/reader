@@ -11,11 +11,11 @@
 ;; The different types of nodes in the AST
 (add-ns ast (git-dependency "https://github.com/Toccata-Lang/ast.git"
                             "ast.toc"
-                            :sha "f854f65"))
+                            :sha "7f5918a"))
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
-                          :sha "6ee9b41"))
+                          :sha "060be51"))
 
 (defn min [x y]
   (either (< x y)
@@ -1570,14 +1570,13 @@
                     line (get-in error [.state .values 'line-number])
                     expr-line (get-in curr-state [.values 'line-number])]
                 (do
-                  (print-err (.val error) " At" (str file ":") (str line ".")
-                             (cond (= line expr-line) ""
-                                   (str "\n In expression at line " (str expr-line "."))))))
+                  (.val error (str (.val error) " At " file ": " line "."
+                                   (cond (= line expr-line) ""
+                                         (str "\n In expression at line " (str expr-line ".")))))))
               (for [file (get-in error [.state .values 'file-name])
                     expr-line (get-in curr-state [.values 'line-number])]
-                (print-err (.val error) " At" (str file ":") (str expr-line "."))))
-          (print-err (.val error)))
-  error)
+                (.val error (str (.val error) " At " file ": " expr-line "."))))
+          error))
 
 (def read-add-ns
   (grmr/rule
@@ -1631,4 +1630,6 @@
                                             read-inline
                                             read-add-ns
                                             shebang
-                                            bad-expr)))))
+                                            bad-expr
+                                            ;; TODO: detect end of input
+                                            )))))
