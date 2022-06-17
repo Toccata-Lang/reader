@@ -11,11 +11,11 @@
 ;; The different types of nodes in the AST
 (add-ns ast (git-dependency "https://github.com/Toccata-Lang/ast.git"
                             "ast.toc"
-                            :sha "c4259f1"))
+                            :sha "267b32f"))
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
-                          :sha "d43061f"))
+                          :sha "9358528"))
 
 (defn min [x y]
   (either (< x y)
@@ -74,7 +74,7 @@
                                               (symbol (to-str (comp [start] the-rest)))
                                               (symbol (to-str (comp (list ns-prefix start)
                                                                     the-rest)))
-                                              file-name line-number)))
+                                              file-name line-number c/top-type)))
                        (grmr/get-value 'file-name)
                        (grmr/get-value 'line-number)
                        (grmr/optional read-namespace)
@@ -725,7 +725,7 @@
                        (grmr/ignore (grmr/one-or-more whitespace))
                        (grmr/any read-type-expr
                                  read-inner-type-of-type
-                                 (grmr/error "Ivalid type expression"))
+                                 (grmr/error "Invalid type expression"))
                        (grmr/ignore (grmr/one-or-more whitespace))
                        (grmr/any read-symbol
                                  (grmr/error "Missing symbol to assert type of in assertion expression."))
