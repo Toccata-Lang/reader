@@ -11,11 +11,11 @@
 ;; The different types of nodes in the AST
 (add-ns ast (git-dependency "https://github.com/Toccata-Lang/ast.git"
                             "ast.toc"
-                            :sha "89cce90"))
+                            :sha "d6123ff"))
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
-                          :sha "9414a82"))
+                          :sha "38d72f3"))
 
 (defn min [x y]
   (either (< x y)
@@ -1015,9 +1015,11 @@
                                    (maybe (map frms quote-literal)))]
                   (ast/call-ast (ast/tag 'vector (ast/file-name quoted-list)
                                      (ast/line-number quoted-list))
-                                (vec contents))))
+                                (vec contents)
+                                c/top-type)))
             (ast/call-ast (ast/tag 'list (ast/file-name quoted-list) (ast/line-number quoted-list))
-                          (vec (map quoted-list quote-literal))))))
+                          (vec (map quoted-list quote-literal))
+                          c/top-type))))
 
 (extend-type Vector
   QuoteLiteral
@@ -1033,9 +1035,11 @@
                       contents (or (empty? frms)
                                    (maybe (map frms quote-literal)))]
                   (ast/call-ast (ast/tag 'vector (ast/file-name quoted-vect) (ast/line-number quoted-vect))
-                                contents)))
+                                contents
+                                c/top-type)))
             (ast/call-ast (ast/tag 'list (ast/file-name quoted-vect) (ast/line-number quoted-vect))
-                          (map quoted-vect quote-literal)))))
+                          (map quoted-vect quote-literal)
+                          c/top-type))))
 
 (def read-quoted-value
   (grmr/recursive-rule "quoted-value"
@@ -1073,14 +1077,16 @@
       (ast/cond-ast
        [(ast/cond-val-ast clause body)]
        (ast/call-ast (ast/tag 'zero fn ln)
-                     [wrapper]))))
+                     [wrapper]
+                     c/top-type))))
 
   (nest-when-not [body clause wrapper]
     (let [fn (ast/file-name clause)
           ln (ast/line-number clause)]
       (ast/cond-ast
        [(ast/cond-val-ast clause (ast/call-ast (ast/tag 'zero fn ln)
-                                               [wrapper]))]
+                                               [wrapper]
+                                               c/top-type))]
        body)))
 
   (nest-binding [body binding wrapper]))
@@ -1092,7 +1098,8 @@
                   [(.val binding)
                    (ast/fn-expr nothing
                                 [(ast/fn-arity (ast/params [(.binding binding)]) ""
-                                               [body])])])))
+                                               [body])])]
+                  c/top-type)))
 
 (extend-type ast/call-ast
   ForBinding
@@ -1101,7 +1108,8 @@
                   [(.val binding)
                    (ast/fn-expr nothing
                                 [(ast/fn-arity (ast/params [(.binding binding)]) ""
-                                               [body])])])))
+                                               [body])])]
+                  c/top-type)))
 
 (extend-type ast/either-ast
   ForBinding
@@ -1110,7 +1118,8 @@
                   [(.val binding)
                    (ast/fn-expr nothing
                                 [(ast/fn-arity (ast/params [(.binding binding)]) ""
-                                               [body])])])))
+                                               [body])])]
+                  c/top-type)))
 
 (extend-type ast/cond-ast
   ForBinding
@@ -1119,7 +1128,8 @@
                   [(.val binding)
                    (ast/fn-expr nothing
                                 [(ast/fn-arity (ast/params [(.binding binding)]) ""
-                                               [body])])])))
+                                               [body])])]
+                  c/top-type)))
 
 (extend-type ast/binding-ast
   ForBinding
@@ -1199,25 +1209,31 @@
       (ast/call-ast
        (ast/tag 'flat-map fn ln)
        [(ast/cond-ast [(ast/cond-val-ast clause (ast/call-ast (ast/tag 'wrap fn ln)
-                                                               [wrapper body]))]
+                                                              [wrapper body]
+                                                              c/top-type))]
                        (ast/call-ast (ast/tag 'zero fn ln)
-                                     [wrapper]))
+                                     [wrapper]
+                                     c/top-type))
         (ast/fn-expr nothing
                      [(ast/fn-arity (ast/params [(ast/tag "#x" fn ln)]) ""
                                     [(ast/call-ast (ast/tag 'wrap fn ln)
-                                                   [wrapper (ast/tag "#x" fn ln)])])])])))
+                                                   [wrapper (ast/tag "#x" fn ln)]
+                                                   c/top-type)])])]
+       c/top-type)))
 
   (nest-when-not [_ clause wrapper]
     (let [fn (ast/file-name clause)
           ln (ast/line-number clause)]
       (ast/call-ast
        (ast/tag 'flat-map fn ln)
-       [(ast/cond-ast [(ast/cond-val-ast clause (ast/call-ast (ast/tag 'zero fn ln) [wrapper]))]
-                      (ast/call-ast (ast/tag 'wrap fn ln) [wrapper body]))
+       [(ast/cond-ast [(ast/cond-val-ast clause (ast/call-ast (ast/tag 'zero fn ln) [wrapper] c/top-type))]
+                      (ast/call-ast (ast/tag 'wrap fn ln) [wrapper body] c/top-type))
         (ast/fn-expr nothing
                      [(ast/fn-arity (ast/params [(ast/tag "#x" fn ln)]) ""
                                     [(ast/call-ast (ast/tag 'wrap fn ln)
-                                                   [wrapper (ast/tag "#x" fn ln)])])])])))
+                                                   [wrapper (ast/tag "#x" fn ln)]
+                                                   c/top-type)])])]
+       c/top-type)))
 
   (nest-binding [_ binding wrapper]
     (let [fn (ast/file-name binding)
@@ -1226,7 +1242,8 @@
                     [(.val binding)
                      (ast/fn-expr nothing
                                   [(ast/fn-arity (ast/params [(.binding binding)]) ""
-                                                 [body])])])))
+                                                 [body])])]
+                    c/top-type)))
 
   Stringable
   (string-list [_] (comp (list "<ForResult ")
@@ -1286,7 +1303,8 @@
                                      (partial instance? ast/NoCode))]
     (reduce exprs first-expr (fn [threaded expr]
                                (ast/call-ast (.call-target expr)
-                                             (comp [threaded] (.args expr)))))))
+                                             (comp [threaded] (.args expr))
+                                             c/top-type)))))
 
 (def read-thread-expr
   (grmr/rule "->exp"
@@ -1315,7 +1333,7 @@
 (def read-empty-list
   (grmr/rule "empty-list"
              (apply-to (fn [fn ln]
-                         (ast/call-ast (ast/tag 'list fn ln) []))
+                         (ast/call-ast (ast/tag 'list fn ln) [] c/top-type))
                        (grmr/get-value 'file-name)
                        (grmr/get-value 'line-number)
                        (grmr/ignore "(")
