@@ -11,11 +11,11 @@
 ;; The different types of nodes in the AST
 (add-ns ast (git-dependency "https://github.com/Toccata-Lang/ast.git"
                             "ast.toc"
-                            :sha "ae24525"))
+                            :sha "f7c128f"))
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
-                          :sha "2eaf733"))
+                          :sha "dcff0f2"))
 
 (defn min [x y]
   (either (< x y)
@@ -389,17 +389,17 @@
 (defn set-items [c items]
   (apo (fn [c]
          (cond (instance? ListOrVect c)
-               (RecurseWith (.items c items))
+               (RecurseFinal (.items c items))
 
-               (RecurseReturn c)))
+               (RecurseWith c)))
        c))
 
 (defn set-tail [c tail]
   (apo (fn [c]
          (cond (instance? ListOrVect c)
-               (RecurseWith (.tail-c c tail))
+               (RecurseFinal (.tail-c c tail))
 
-               (RecurseReturn c)))
+               (RecurseWith c)))
        c))
 
 (defn assert-min-count [file-name line-number len]
