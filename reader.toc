@@ -11,11 +11,11 @@
 ;; The different types of nodes in the AST
 (add-ns ast (git-dependency "https://github.com/Toccata-Lang/ast.git"
                             "ast.toc"
-                            :sha "f7c128f"))
+                            :sha "4a55b5f"))
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
-                          :sha "dcff0f2"))
+                          :sha "69c64b9"))
 
 (defn min [x y]
   (either (< x y)
@@ -190,14 +190,16 @@
 (def read-integer-literal
   (grmr/rule "number"
              (grmr/any (apply-to (fn [file-name line-num digits]
+                                   ;; TODO: could fully specify the int constraint here
                                    (ast/integer-ast (str-to-int (to-str digits))
-                                                    file-name line-num))
+                                                    file-name line-num c/int-constraint))
                                  (grmr/get-value 'file-name)
                                  (grmr/get-value 'line-number)
                                  (grmr/one-or-more grmr/digit))
                        (apply-to (fn [file-name line-num digits]
+                                   ;; TODO: could fully specify the int constraint here
                                    (ast/integer-ast (* -1 (str-to-int (to-str digits)))
-                                                    file-name line-num))
+                                                    file-name line-num c/int-constraint))
                                  (grmr/get-value 'file-name)
                                  (grmr/get-value 'line-number)
                                  (grmr/ignore "-")
@@ -1075,8 +1077,8 @@
   (nest-when [body clause wrapper]
     (let [fn (ast/file-name clause)
           ln (ast/line-number clause)]
-      (ast/cond-ast
-       [(ast/cond-val-ast clause body)]
+      (ast/cond-expr
+       [(ast/cond-val-expr clause body)]
        (ast/call-ast (ast/tag 'zero fn ln)
                      [wrapper]
                      c/top-type))))
@@ -1084,10 +1086,10 @@
   (nest-when-not [body clause wrapper]
     (let [fn (ast/file-name clause)
           ln (ast/line-number clause)]
-      (ast/cond-ast
-       [(ast/cond-val-ast clause (ast/call-ast (ast/tag 'zero fn ln)
-                                               [wrapper]
-                                               c/top-type))]
+      (ast/cond-expr
+       [(ast/cond-val-expr clause (ast/call-ast (ast/tag 'zero fn ln)
+                                                [wrapper]
+                                                c/top-type))]
        body)))
 
   (nest-binding [body binding wrapper]))
@@ -1209,9 +1211,9 @@
           ln (ast/line-number clause)]
       (ast/call-ast
        (ast/tag 'flat-map fn ln)
-       [(ast/cond-ast [(ast/cond-val-ast clause (ast/call-ast (ast/tag 'wrap fn ln)
-                                                              [wrapper body]
-                                                              c/top-type))]
+       [(ast/cond-expr [(ast/cond-val-expr clause (ast/call-ast (ast/tag 'wrap fn ln)
+                                                                [wrapper body]
+                                                                c/top-type))]
                        (ast/call-ast (ast/tag 'zero fn ln)
                                      [wrapper]
                                      c/top-type))
@@ -1227,7 +1229,7 @@
           ln (ast/line-number clause)]
       (ast/call-ast
        (ast/tag 'flat-map fn ln)
-       [(ast/cond-ast [(ast/cond-val-ast clause (ast/call-ast (ast/tag 'zero fn ln) [wrapper] c/top-type))]
+       [(ast/cond-expr [(ast/cond-val-expr clause (ast/call-ast (ast/tag 'zero fn ln) [wrapper] c/top-type))]
                       (ast/call-ast (ast/tag 'wrap fn ln) [wrapper body] c/top-type))
         (ast/fn-expr nothing
                      [(ast/fn-arity (ast/params [(ast/tag "#x" fn ln)]) ""
