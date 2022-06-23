@@ -11,7 +11,7 @@
 ;; The different types of nodes in the AST
 (add-ns ast (git-dependency "https://github.com/Toccata-Lang/ast.git"
                             "ast.toc"
-                            :sha "4a55b5f"))
+                            :sha "a89f692"))
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
@@ -162,7 +162,8 @@
 (def read-string-literal
   (grmr/rule "string"
              (apply-to (fn [file-name line-num frags]
-                         (ast/string-ast (to-str frags) file-name line-num))
+                         ;; TODO: could fully specify the int constraint here
+                         (ast/string-ast (to-str frags) file-name line-num c/strbuff-constraint))
                        (grmr/ignore "\"")
                        (grmr/get-value 'file-name)
                        (grmr/get-value 'line-number)
@@ -931,7 +932,7 @@
 (def curr-file-name
   (grmr/rule "_FILE_"
              (apply-to (fn [file-name line-num]
-                         (ast/string-ast file-name file-name line-num))
+                         (ast/string-ast file-name file-name line-num c/strbuff-constraint))
                        ignore-whitespace
                        (grmr/ignore "_FILE_")
                        (grmr/get-value 'file-name)
