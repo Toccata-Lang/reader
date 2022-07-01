@@ -913,8 +913,14 @@
                                  ignore-whitespace
                                  (grmr/any read-symbol
                                            (grmr/all "(" (grmr/error "Missing protocol name in expression.")))
-                                 (apply-to (fn [impl-fns]
-                                             (apply merge-with (cons comp (seq impl-fns))))
+                                 (apply-to (fn [impl-arities]
+                                             ;; TODO: add this in eventually, requires changes to reify-ast,
+                                             ;; extend-ast, and type-ast.
+                                             ;; (reduce impl-arities {}
+                                             ;;         (fn [m arity]
+                                             ;;           (assert (instance? ast/fn-arity-ast arities))
+                                             ;;           (assoc m (-> arity .params .fixed count) arity)))
+                                             (apply merge-with (cons comp (seq impl-arities))))
                                            (grmr/one-or-more read-implementation))))))
 
 (def read-reify
