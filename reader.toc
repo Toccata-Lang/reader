@@ -11,11 +11,11 @@
 ;; The different types of nodes in the AST
 (add-ns ast (git-dependency "https://github.com/Toccata-Lang/ast.git"
                             "ast.toc"
-                            :sha "4645330"))
+                            :sha "39c965a"))
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
-                          :sha "bdace96"))
+                          :sha "b0328fb"))
 
 (defn min [x y]
   (either (< x y)
@@ -36,7 +36,7 @@
 
 (def symbol-punct
   (grmr/rule "symbol-punct"
-               (grmr/one-of "._<>=+-*/!?")))
+               (grmr/one-of "._<>=+-*/?")))
 
 (def symbol-char
   (grmr/rule "symbol-char"
@@ -48,7 +48,7 @@
 
 (def namespace-punct
   (grmr/rule "namespace-punct"
-               (grmr/one-of "._<>=*+!-?")))
+               (grmr/one-of "._<>=*+-?")))
 
 (def rest-of-namespace
   (grmr/rule "rest-of-namespace"
@@ -740,29 +740,56 @@
 
 (def read-assert
   (grmr/rule "assert"
-             (apply-to identity
-                       read-open-paren
-                       (grmr/ignore "assert")
-                       (grmr/ignore (grmr/one-or-more whitespace))
-                       (grmr/any read-type-assertion
-                                 read-show-type
-                                 (grmr/error "Missing type assertion in 'assert' expression."))
-                       read-close-paren)))
+             (grmr/any (apply-to identity
+                                 read-open-paren
+                                 (grmr/ignore "assert")
+                                 (grmr/ignore (grmr/one-or-more whitespace))
+                                 (grmr/any read-type-assertion
+                                           read-show-type
+                                           (grmr/error "Missing type assertion in 'assert' expression."))
+                                 read-close-paren)
+                       (apply-to (fn [c sym]
+                                   (assert (instance? c/SymbolConstraints c))
+                                   (-> c
+                                       (c/update-path (ast/location sym))
+                                       (c/update-sym (ast/untag sym))))
+                                 ignore-whitespace
+                                 (grmr/ignore "!")
+                                 ignore-whitespace
+                                 (grmr/any read-type-expr
+                                           read-inner-type-of-type
+                                           read-seq-type
+                                           (grmr/error "Missing type assertion in 'assert-result' expression."))
+                                 ignore-whitespace
+                                 read-symbol
+                                 (grmr/ignore (grmr/none-or-more not-eol))
+                                 (grmr/ignore newline)))))
 
 (def read-assert-result
   (grmr/rule "assert-result"
-             (apply-to ast/result-expr
-                       read-open-paren
-                       (grmr/ignore "assert-result")
-                       (grmr/ignore (grmr/one-or-more whitespace))
-                       ;; TODO: remove this when code formatter is ready
-                       (grmr/ignore (grmr/optional read-symbol))
-                       (grmr/ignore (grmr/one-or-more whitespace))
-                       (grmr/any read-type-assertion
-                                 read-show-type
-                                 read-seq-type
-                                 (grmr/error "Missing type assertion in 'assert-result' expression."))
-                       read-close-paren)))
+             (grmr/any (apply-to ast/result-expr
+                                 read-open-paren
+                                 (grmr/ignore "assert-result")
+                                 (grmr/ignore (grmr/one-or-more whitespace))
+                                 ;; TODO: remove this when code formatter is ready
+                                 (grmr/ignore (grmr/optional read-symbol))
+                                 (grmr/ignore (grmr/one-or-more whitespace))
+                                 (grmr/any read-type-assertion
+                                           read-show-type
+                                           read-seq-type
+                                           (grmr/error "Missing type assertion in 'assert-result' expression."))
+                                 read-close-paren)
+                       (apply-to (fn [c]
+                                   (c/update-sym c (ast/untag ast/result-sym)))
+                                 ignore-whitespace
+                                 (grmr/ignore "!returns")
+                                 ignore-whitespace
+                                 (grmr/any read-type-expr
+                                           read-inner-type-of-type
+                                           read-seq-type
+                                           (grmr/error "Missing type assertion in 'assert-result' expression."))
+                                 (grmr/ignore (grmr/none-or-more not-eol))
+                                 (grmr/ignore newline)))))
 
 (def read-apply-to
   (grmr/rule "apply-to"
