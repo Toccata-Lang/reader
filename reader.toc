@@ -11,11 +11,11 @@
 ;; The different types of nodes in the AST
 (add-ns ast (git-dependency "https://github.com/Toccata-Lang/ast.git"
                             "ast.toc"
-                            :sha "39c965a"))
+                            :sha "c48b985"))
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
-                          :sha "b0328fb"))
+                          :sha "17040b1"))
 
 (defn min [x y]
   (either (< x y)
@@ -511,6 +511,21 @@
                        read-integer-literal
                        read-close-paren)))
 
+(def read-required-arities
+  (grmr/rule "type-of-result"
+             (apply-to (fn [file line arg-counts]
+                         ;; ! (vector-of Integer) arg-counts
+                         (-> (c/AritiesRequired arg-counts empty-list c/no-symbol "")
+                             (c/update-path file line)))
+                       read-open-paren
+                       ignore-whitespace
+                       (grmr/ignore "required-arities")
+                       (grmr/get-value 'file-name)
+                       (grmr/get-value 'line-number)
+                       ignore-whitespace
+                       (grmr/one-or-more read-integer-literal)
+                       read-close-paren)))
+
 (def read-type-of-result-type
   (grmr/rule "type-of-result"
              (apply-to (fn [file line sym]
@@ -564,6 +579,7 @@
                                                              read-inner-type-of-type
                                                              read-type-of-arg-type
                                                              read-type-of-result-type
+                                                             read-required-arities
                                                              read-type-of-type))
                                  (grmr/error "The 'all-of' expression must contain at least one"
                                              "type expression."))
@@ -588,6 +604,7 @@
                                                              read-inner-type-of-type
                                                              read-type-of-arg-type
                                                              read-type-of-result-type
+                                                             read-required-arities
                                                              read-type-of-type))
                                  (grmr/error "The 'any-of' expression must contain at least one"
                                              "type expression."))
@@ -622,6 +639,7 @@
                                  read-inner-type-of-type
                                  read-type-of-arg-type
                                  read-type-of-result-type
+                                 read-required-arities
                                  read-type-of-type)
                        read-close-paren)))
 
@@ -649,12 +667,14 @@
                                                                              read-inner-type-of-type
                                                                              read-type-of-arg-type
                                                                              read-type-of-result-type
+                                                                             read-required-arities
                                                                              read-type-of-type))
                                                 read-close-bracket))
                        (grmr/optional (grmr/any read-sub-type
                                                 read-inner-type-of-type
                                                 read-type-of-arg-type
                                                 read-type-of-result-type
+                                                read-required-arities
                                                 read-type-of-type))
                        read-close-paren)))
 
@@ -714,6 +734,7 @@
                                  read-generic-type
                                  read-type-of-arg-type
                                  read-type-of-result-type
+                                 read-required-arities
                                  read-type-of-type
                                  read-min-count-assertion
                                  read-min-val-assertion
