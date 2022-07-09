@@ -776,6 +776,7 @@
                                        (c/update-sym (ast/untag sym))))
                                  ignore-whitespace
                                  (grmr/ignore "!")
+                                 (grmr/ignore (grmr/any " " read-string-tab))
                                  ignore-whitespace
                                  (grmr/any read-type-expr
                                            read-inner-type-of-type
@@ -792,7 +793,6 @@
                                  read-open-paren
                                  (grmr/ignore "assert-result")
                                  (grmr/ignore (grmr/one-or-more whitespace))
-                                 ;; TODO: remove this when code formatter is ready
                                  (grmr/ignore (grmr/optional read-symbol))
                                  (grmr/ignore (grmr/one-or-more whitespace))
                                  (grmr/any read-type-assertion
