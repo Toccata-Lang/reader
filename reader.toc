@@ -11,11 +11,11 @@
 ;; The different types of nodes in the AST
 (add-ns ast (git-dependency "https://github.com/Toccata-Lang/ast.git"
                             "ast.toc"
-                            :sha "c48b985"))
+                            :sha "6d70e85"))
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
-                          :sha "17040b1"))
+                          :sha "2a23f82"))
 
 (defn min [x y]
   (either (< x y)
@@ -477,7 +477,8 @@
                        (grmr/get-value 'file-name)
                        (grmr/get-value 'line-number)
                        ignore-whitespace
-                       read-symbol
+                       (grmr/any read-symbol
+                                 (grmr/error "Invalid 'inner-type-of' expression"))
                        read-close-paren)))
 
 (def read-type-of-type
@@ -512,7 +513,7 @@
                        read-close-paren)))
 
 (def read-required-arities
-  (grmr/rule "type-of-result"
+  (grmr/rule "required-arities"
              (apply-to (fn [file line arg-counts]
                          ;; ! (vector-of Integer) arg-counts
                          (-> (c/AritiesRequired arg-counts empty-list c/no-symbol "")
@@ -528,16 +529,23 @@
 
 (def read-type-of-result-type
   (grmr/rule "type-of-result"
-             (apply-to (fn [file line sym]
-                         (-> (c/ResultOf (ast/untag sym) empty-list c/no-symbol "")
-                             (c/update-path file line)))
+             (apply-to (fn [file line sym-or-c]
+                         (-> (cond (instance? ast/tagged-symbol sym-or-c)
+                                   (c/ResultOf (ast/untag sym-or-c) empty-list c/no-symbol "")
+
+                                   (c/intersect (c/CallValue c/no-args empty-list c/no-symbol "")
+                                                sym-or-c))
+                             (c/update-path file line)) )
                        read-open-paren
                        ignore-whitespace
                        (grmr/ignore "type-of-result")
                        (grmr/get-value 'file-name)
                        (grmr/get-value 'line-number)
                        ignore-whitespace
-                       read-symbol
+                       (grmr/any read-symbol
+                                 read-sub-type
+                                 read-inner-type-of-type
+                                 (grmr/error "Invalid type expression"))
                        read-close-paren)))
 
 (defn assert-map-of [key-type val-type]
