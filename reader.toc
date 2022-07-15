@@ -11,11 +11,11 @@
 ;; The different types of nodes in the AST
 (add-ns ast (git-dependency "https://github.com/Toccata-Lang/ast.git"
                             "ast.toc"
-                            :sha "6d70e85"))
+                            :sha "f00e0e8"))
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
-                          :sha "2a23f82"))
+                          :sha "474af33"))
 
 (defn min [x y]
   (either (< x y)
@@ -544,7 +544,6 @@
                        ignore-whitespace
                        (grmr/any read-symbol
                                  read-sub-type
-                                 read-inner-type-of-type
                                  (grmr/error "Invalid type expression"))
                        read-close-paren)))
 
@@ -583,12 +582,7 @@
                        read-open-paren
                        ignore-whitespace
                        (grmr/ignore "all-of")
-                       (grmr/any (grmr/one-or-more (grmr/any read-sub-type
-                                                             read-inner-type-of-type
-                                                             read-type-of-arg-type
-                                                             read-type-of-result-type
-                                                             read-required-arities
-                                                             read-type-of-type))
+                       (grmr/any (grmr/one-or-more read-sub-type)
                                  (grmr/error "The 'all-of' expression must contain at least one"
                                              "type expression."))
                        read-close-paren)))
@@ -608,12 +602,7 @@
                        (grmr/ignore "any-of")
                        (grmr/get-value 'file-name)
                        (grmr/get-value 'line-number)
-                       (grmr/any (grmr/one-or-more (grmr/any read-sub-type
-                                                             read-inner-type-of-type
-                                                             read-type-of-arg-type
-                                                             read-type-of-result-type
-                                                             read-required-arities
-                                                             read-type-of-type))
+                       (grmr/any (grmr/one-or-more read-sub-type)
                                  (grmr/error "The 'any-of' expression must contain at least one"
                                              "type expression."))
                        read-close-paren)))
@@ -643,12 +632,7 @@
                        (apply grmr/any (keys generic-assertions))
                        (grmr/get-value 'file-name)
                        (grmr/get-value 'line-number)
-                       (grmr/any read-sub-type
-                                 read-inner-type-of-type
-                                 read-type-of-arg-type
-                                 read-type-of-result-type
-                                 read-required-arities
-                                 read-type-of-type)
+                       read-sub-type
                        read-close-paren)))
 
 (def read-list-of
@@ -671,19 +655,9 @@
                                                 ;; TODO: should this use 'open-bracker'?
                                                 ignore-whitespace
                                                 (grmr/ignore "[")
-                                                (grmr/none-or-more (grmr/any read-sub-type
-                                                                             read-inner-type-of-type
-                                                                             read-type-of-arg-type
-                                                                             read-type-of-result-type
-                                                                             read-required-arities
-                                                                             read-type-of-type))
+                                                (grmr/none-or-more read-sub-type)
                                                 read-close-bracket))
-                       (grmr/optional (grmr/any read-sub-type
-                                                read-inner-type-of-type
-                                                read-type-of-arg-type
-                                                read-type-of-result-type
-                                                read-required-arities
-                                                read-type-of-type))
+                       (grmr/optional read-sub-type)
                        read-close-paren)))
 
 (def seq-assertions
@@ -747,6 +721,8 @@
                                  read-min-count-assertion
                                  read-min-val-assertion
                                  read-max-val-assertion
+                                 read-inner-type-of-type
+                                 read-seq-type
                                  (apply-to assert-type
                                            ignore-whitespace
                                            read-symbol))))
@@ -760,7 +736,6 @@
                        (grmr/ignore "instance?")
                        (grmr/ignore (grmr/one-or-more whitespace))
                        (grmr/any read-type-expr
-                                 read-inner-type-of-type
                                  (grmr/error "Invalid type expression"))
                        (grmr/ignore (grmr/one-or-more whitespace))
                        (grmr/any read-symbol
@@ -787,8 +762,6 @@
                                  (grmr/ignore (grmr/any " " read-string-tab))
                                  ignore-whitespace
                                  (grmr/any read-type-expr
-                                           read-inner-type-of-type
-                                           read-seq-type
                                            (grmr/error "Missing type assertion in 'assert-result' expression."))
                                  ignore-whitespace
                                  read-symbol
@@ -814,8 +787,6 @@
                                  (grmr/ignore "!returns")
                                  ignore-whitespace
                                  (grmr/any read-type-expr
-                                           read-inner-type-of-type
-                                           read-seq-type
                                            (grmr/error "Missing type assertion in 'assert-result' expression."))
                                  (grmr/ignore (grmr/none-or-more not-eol))
                                  (grmr/ignore newline)))))
