@@ -11,11 +11,11 @@
 ;; The different types of nodes in the AST
 (add-ns ast (git-dependency "https://github.com/Toccata-Lang/ast.git"
                             "ast.toc"
-                            :sha "99c79d2"))
+                            :sha "5621d7a"))
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
-                          :sha "426739e"))
+                          :sha "b2f6d5f"))
 
 (defn min [x y]
   (either (< x y)
@@ -471,8 +471,9 @@
                          (-> (cond (instance? ast/tagged-symbol sym-or-c)
                                    (c/ResultOf (ast/untag sym-or-c) empty-list c/no-symbol "")
 
-                                   (c/intersect (c/CallValue c/no-args empty-list c/no-symbol "")
-                                                sym-or-c))
+                                   (c/ComputedConstraint [sym-or-c
+                                                          (c/CallValue c/no-args empty-list c/no-symbol "")]
+                                                          empty-list c/no-symbol ""))
                              (c/update-path file line)))
                        read-open-paren
                        ignore-whitespace
