@@ -610,24 +610,38 @@
                        read-close-paren)))
 
 (def generic-assertions
-  {"vector-of" c/vect-constraint
-   "maybe-of" c/maybe-constraint
-   "set-of" c/set-constraint
-   "agent-of" c/agent-constraint
-   "promise-of" c/promise-constraint
-   "sequence-of" c/seq-constraint
-   "function-returns" c/fn-constraint
+  {"vector-of" (fn [contents]
+                 (c/set-tail c/vect-constraint
+                             (c/CollectionOf contents empty-list c/no-symbol "")))
+   "maybe-of" (fn [contents]
+                (.contents c/maybe-constraint contents))
+   "set-of" (fn [contents]
+              (c/intersect c/set-constraint
+                           (c/CollectionOf contents empty-list c/no-symbol "")))
+   "agent-of" (fn [contents]
+                (c/intersect c/agent-constraint
+                             (c/CollectionOf contents empty-list c/no-symbol "")))
+   "promise-of" (fn [contents]
+                  (c/intersect c/promise-constraint
+                               (c/CollectionOf contents empty-list c/no-symbol "")))
+   "sequence-of" (fn [contents]
+                   (c/set-tail c/seq-constraint
+                               (c/CollectionOf contents empty-list c/no-symbol "")))
+   "function-returns" (fn [contents]
+                        (c/intersect c/fn-constraint
+                                     (c/CollectionOf contents empty-list c/no-symbol "")))
    })
 
 (def read-generic-type
   (grmr/rule "generic-type"
              (apply-to (fn [base-string file line contents-type]
-                         (-> (either (get generic-assertions base-string)
+                         (-> (either (map (get generic-assertions base-string)
+                                          (fn [f]
+                                            (f contents-type)))
                                      (fn [_]
                                        (print-err "No generic type" (str "'" base-string "'")
                                                   "exists. At" file ": " line)
                                        (abort)))
-                             (c/intersect (c/CollectionOf contents-type empty-list c/no-symbol ""))
                              (c/update-path file line)))
                        read-open-paren
                        ignore-whitespace
