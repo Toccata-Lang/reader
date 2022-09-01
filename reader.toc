@@ -11,11 +11,11 @@
 ;; The different types of nodes in the AST
 (add-ns ast (git-dependency "https://github.com/Toccata-Lang/ast.git"
                             "ast.toc"
-                            :sha "f2765e7"))
+                            :sha "05f949b"))
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
-                          :sha "d8aec0b"))
+                          :sha "7a9995f"))
 
 (defn min [x y]
   (either (< x y)
@@ -610,7 +610,9 @@
                        read-close-paren)))
 
 (def generic-assertions
-  {"vector-of" (fn [contents]
+  {"contains" (fn [contents]
+                (c/CollectionOf contents empty-list c/no-symbol ""))
+   "vector-of" (fn [contents]
                  (c/set-tail c/vect-constraint
                              (c/CollectionOf contents empty-list c/no-symbol "")))
    "maybe-of" (fn [contents]
