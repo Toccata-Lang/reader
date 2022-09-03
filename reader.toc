@@ -11,11 +11,11 @@
 ;; The different types of nodes in the AST
 (add-ns ast (git-dependency "https://github.com/Toccata-Lang/ast.git"
                             "ast.toc"
-                            :sha "05f949b"))
+                            :sha "6e6d171"))
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
-                          :sha "7a9995f"))
+                          :sha "66cf8a8"))
 
 (defn min [x y]
   (either (< x y)
@@ -412,6 +412,7 @@
       (set-tail c/coll-of-any)
       (c/update-path file-name line-number)))
 
+;; TODO: might be useful to have a max count
 (def read-min-count-assertion
   (grmr/rule "assert-min-count"
              (apply-to assert-min-count
@@ -456,7 +457,7 @@
                        ignore-whitespace
                        (grmr/get-value 'file-name)
                        (grmr/get-value 'line-number)
-                       (grmr/ignore "min")
+                       (grmr/ignore "min-value")
                        (grmr/ignore (grmr/one-or-more whitespace))
                        (grmr/any read-integer
                                  (grmr/error "The 'min' expression must contain an integer minimum value."))
@@ -612,9 +613,6 @@
 (def generic-assertions
   {"contains" (fn [contents]
                 (c/CollectionOf contents empty-list c/no-symbol ""))
-   "vector-of" (fn [contents]
-                 (c/set-tail c/vect-constraint
-                             (c/CollectionOf contents empty-list c/no-symbol "")))
    "maybe-of" (fn [contents]
                 (.contents c/maybe-constraint contents))
    "set-of" (fn [contents]
@@ -653,10 +651,10 @@
                        read-sub-type
                        read-close-paren)))
 
-(def read-list-of
-  (grmr/rule "list-of"
-             (apply-to (fn [file line items-types tail-type]
-                         (-> c/list-constraint
+(def read-seq-of
+  (grmr/rule "seq-of"
+             (apply-to (fn [file line [seq-constraint] items-types tail-type]
+                         (-> seq-constraint
                              (.items (either items-types
                                              []))
                              (.tail-c (either (map tail-type
@@ -666,9 +664,12 @@
                              (c/update-path file line)))
                        read-open-paren
                        ignore-whitespace
-                       (grmr/ignore "list-of")
                        (grmr/get-value 'file-name)
                        (grmr/get-value 'line-number)
+                       (grmr/any (grmr/all (grmr/ignore "list-of")
+                                           (grmr/always c/list-constraint))
+                                 (grmr/all (grmr/ignore "vector-of")
+                                           (grmr/always c/vect-constraint)))
                        (grmr/optional (apply-to identity
                                                 ;; TODO: should this use 'open-bracker'?
                                                 ignore-whitespace
@@ -730,7 +731,7 @@
                        (grmr/any read-sum-type
                                  read-multi-type
                                  read-map-assertion
-                                 read-list-of
+                                 read-seq-of
                                  read-generic-type
                                  read-type-of-arg-type
                                  read-type-of-result-type
@@ -1460,7 +1461,7 @@
                                                      read-sum-type
                                                      read-multi-type
                                                      read-map-assertion
-                                                     read-list-of
+                                                     read-seq-of
                                                      read-generic-type
                                                      read-expr)
                                            ignore-whitespace
