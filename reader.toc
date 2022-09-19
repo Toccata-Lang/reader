@@ -11,11 +11,11 @@
 ;; The different types of nodes in the AST
 (add-ns ast (git-dependency "https://github.com/Toccata-Lang/ast.git"
                             "ast.toc"
-                            :sha "f603fbf"))
+                            :sha "8ffbebb"))
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
-                          :sha "3760cb3"))
+                          :sha "c7d4db0"))
 
 (defn min [x y]
   (either (< x y)
@@ -1684,6 +1684,11 @@
 
 (def type-literals {"empty-list" empty-list
                     "c/no-symbol" c/no-symbol
+                    "c/no-int" c/no-int
+                    "c/no-string" c/no-string
+                    "c/no-fields" c/no-fields
+                    "c/no-args" c/no-args
+                    "c/variadic" c/variadic
                     "c/top-type" c/top-type
                     "c/bottom-type" c/bottom-type})
 
@@ -1704,6 +1709,29 @@
                        "c/fn-arity" c/fn-arity
                        "c/ListConstraint" c/ListConstraint
                        "c/ParamConstraint" c/ParamConstraint
+                       "c/MaybeConstraint" c/MaybeConstraint
+                       "c/IntegerConstraint" c/IntegerConstraint
+                       "c/TypeOfConstraint" c/TypeOfConstraint
+                       "c/InnerTypeOfConstraint" c/InnerTypeOfConstraint
+                       "c/SymbolConstraint" c/SymbolConstraint
+                       "c/StrBuffConstraint" c/StrBuffConstraint
+                       "c/SubStrConstraint" c/SubStrConstraint
+                       "c/HashMapConstraint" c/HashMapConstraint
+                       "c/VectorConstraint" c/VectorConstraint
+                       "c/AgentConstraint" c/AgentConstraint
+                       "c/FutureConstraint" c/FutureConstraint
+                       "c/OpaqueConstraint" c/OpaqueConstraint
+                       "c/PromiseConstraint" c/PromiseConstraint
+                       "c/ReifiedConstraint" c/ReifiedConstraint
+                       "c/SumConstraint" c/SumConstraint
+                       "c/ComputedConstraint" c/ComputedConstraint
+                       "c/ModSeqType" c/ModSeqType
+                       "c/ArgOf" c/ArgOf
+                       "c/ResultOf" c/RestOf
+                       "c/AritiesRequired" c/AritiesRequired
+                       "c/CallValue" c/CallValue
+                       "c/SetField" c/SetField
+                       "c/GetField" c/GetField
                        "c/fn-arity" c/fn-arity
                        })
 
@@ -1763,8 +1791,8 @@
                        (grmr/get-value 'file-name)
                        (grmr/get-value 'line-number)
                        ignore-whitespace
-                       read-expected-type
                        read-expr
+                       read-expected-type
                        read-close-paren)))
 
 (def top-level
