@@ -11,11 +11,11 @@
 ;; The different types of nodes in the AST
 (add-ns ast (git-dependency "https://github.com/Toccata-Lang/ast.git"
                             "ast.toc"
-                            :sha "3bb8018"))
+                            :sha "f603fbf"))
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
-                          :sha "66cf8a8"))
+                          :sha "3760cb3"))
 
 (defn min [x y]
   (either (< x y)
@@ -638,7 +638,7 @@
                          (-> (either (map (get generic-assertions base-string)
                                           (fn [f]
                                             (f contents-type)))
-                                     (fn [_]
+                                     (do
                                        (print-err "No generic type" (str "'" base-string "'")
                                                   "exists. At" file ": " line)
                                        (abort)))
@@ -708,16 +708,15 @@
 
 (def read-show-type
   (grmr/rule "show-type"
-             (apply-to (fn [file line sym]
-                         (-> (c/DebugConstraint c/top-type empty-list (ast/untag sym) "")
-                             (c/update-path file line)))
+             (apply-to (fn [file line expr]
+                         (ast/call-expr [(ast/tag "show-type" file line) expr]))
                        read-open-paren
                        ignore-whitespace
                        (grmr/ignore "show-type")
                        (grmr/get-value 'file-name)
                        (grmr/get-value 'line-number)
                        ignore-whitespace
-                       read-symbol
+                       read-sub-expr
                        read-close-paren)))
 
 (defn assert-type [type-sym]
@@ -1389,16 +1388,6 @@
                                  (grmr/error "Invalid '->' expression."))
                        read-close-paren)))
 
-(def read-empty-list
-  (grmr/rule "empty-list"
-             (apply-to (fn [fn ln]
-                         (ast/call-ast (ast/tag 'list fn ln) [] c/top-type))
-                       (grmr/get-value 'file-name)
-                       (grmr/get-value 'line-number)
-                       (grmr/ignore "(")
-                       ignore-whitespace
-                       (grmr/ignore ")"))))
-
 (def read-expr
   (grmr/recursive-rule "expr"
                        (apply-to identity
@@ -1425,7 +1414,6 @@
                                            read-threading
                                            read-assert
                                            read-assert-result
-                                           read-empty-list
                                            (grmr/all read-inline
                                                      (grmr/error "'inline' expressions not allowed here."))
                                            read-call
@@ -1690,6 +1678,95 @@
                                               (grmr/none-or-more not-eol)
                                               newline))))
 
+;; TODO: for regression testing type checker
+(def read-sub-exp-type
+  (grmr/recurse "expected-type"))
+
+(def type-literals {"empty-list" empty-list
+                    "c/no-symbol" c/no-symbol
+                    "c/top-type" c/top-type
+                    "c/bottom-type" c/bottom-type})
+
+(def read-type-literal
+  (grmr/rule "type-literal"
+             (apply-to (fn [lit-name]
+                         (either (get type-literals lit-name)
+                                 (do
+                                   (print-err "No type literal named" (str "'" lit-name "'")
+                                              "exists.")
+                                   (abort))))
+                       ignore-whitespace
+                       (apply grmr/any (keys type-literals)))))
+
+(def type-constraints {"c/AllValues" c/AllValues
+                       "c/NoValues" c/NoValues
+                       "c/FnConstraint" c/FnConstraint
+                       "c/fn-arity" c/fn-arity
+                       "c/ListConstraint" c/ListConstraint
+                       "c/ParamConstraint" c/ParamConstraint
+                       "c/fn-arity" c/fn-arity
+                       })
+
+(def read-type-constraint
+  (grmr/rule "type-constraint"
+             (apply-to (fn [constraint-name args]
+                         (either (map (get type-constraints constraint-name)
+                                      (fn [f]
+                                        (apply f args)))
+                                 (do
+                                   (print-err "No constraint named" (str "'" constraint-name "'")
+                                              "exists.")
+                                   (abort))))
+                       read-open-paren
+                       ignore-whitespace
+                       (apply grmr/any (keys type-constraints))
+                       (grmr/one-or-more (apply-to identity
+                                                   ignore-whitespace
+                                                   read-sub-exp-type))
+                       read-close-paren)))
+
+(def read-arity-map
+  (grmr/rule "arity-map"
+             (apply-to identity
+                       (grmr/ignore "{")
+                       (apply-to (fn [elems]
+                                   (reduce elems {} (fn [m [k v]]
+                                                      (assoc m k v))))
+                                 (grmr/none-or-more (grmr/all read-integer
+                                                              read-type-constraint))
+                                 (grmr/any (grmr/ignore "}")
+                                           (grmr/error "Missing \"}\"."))))))
+
+(def read-expected-type
+  (grmr/recursive-rule "expected-type"
+                       (grmr/any read-type-literal
+                                 read-integer
+                                 read-string
+                                 read-arity-map
+                                 (apply-to identity
+                                           (grmr/ignore "[")
+                                           (apply-to vec
+                                                     (grmr/none-or-more read-sub-exp-type)
+                                                     read-close-bracket))
+                                 (apply-to (fn [q-ast]
+                                             (ast/untag (.q-val q-ast)))
+                                           read-quoted)
+                                 read-type-constraint)))
+
+(def read-is-type
+  (grmr/rule "is-type"
+             (apply-to (fn [file line type-expr expr]
+                         (ast/call-expr [(ast/tag "is-type" file line) type-expr expr]))
+                       read-open-paren
+                       ignore-whitespace
+                       (grmr/ignore "is-type")
+                       (grmr/get-value 'file-name)
+                       (grmr/get-value 'line-number)
+                       ignore-whitespace
+                       read-expected-type
+                       read-expr
+                       read-close-paren)))
+
 (def top-level
   (grmr/recursive-rule "top-level"
                        (apply-to identity
@@ -1707,6 +1784,7 @@
                                             read-inline
                                             read-add-ns
                                             read-show-type
+                                            read-is-type
                                             shebang
                                             bad-expr
                                             ;; TODO: detect end of input
