@@ -11,11 +11,11 @@
 ;; The different types of nodes in the AST
 (add-ns ast (git-dependency "https://github.com/Toccata-Lang/ast.git"
                             "ast.toc"
-                            :sha "635b2dd"))
+                            :sha "12cbba2"))
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
-                          :sha "ca8b498"))
+                          :sha "b1ec78a"))
 
 (defn min [x y]
   (either (< x y)
@@ -547,7 +547,7 @@
                        (grmr/get-value 'file-name)
                        (grmr/get-value 'line-number)
                        ignore-whitespace
-                       (grmr/one-or-more read-integer-literal)
+                       (grmr/one-or-more read-integer)
                        read-close-paren)))
 
 (defn assert-map-of [key-type val-type]
@@ -653,14 +653,9 @@
 
 (def read-seq-of
   (grmr/rule "seq-of"
-             (apply-to (fn [file line [seq-constraint] items-types tail-type]
+             (apply-to (fn [file line [seq-constraint] tail-type]
                          (-> seq-constraint
-                             (.items (either items-types
-                                             []))
-                             (.tail-c (either (map tail-type
-                                                   (fn [tail-type]
-                                                     (c/CollectionOf tail-type empty-list c/no-symbol "")))
-                                              c/bottom-type))
+                             (c/set-tail (c/CollectionOf tail-type empty-list c/no-symbol ""))
                              (c/update-path file line)))
                        read-open-paren
                        ignore-whitespace
@@ -670,12 +665,31 @@
                                            (grmr/always c/list-constraint))
                                  (grmr/all (grmr/ignore "vector-of")
                                            (grmr/always c/vect-constraint)))
-                       (grmr/optional (apply-to identity
-                                                ;; TODO: should this use 'open-bracker'?
-                                                ignore-whitespace
-                                                (grmr/ignore "[")
-                                                (grmr/none-or-more read-sub-type)
-                                                read-close-bracket))
+                       read-sub-type
+                       read-close-paren)))
+
+(def read-seq-as
+  (grmr/rule "seq-as"
+             (apply-to (fn [file line [seq-constraint] items-types tail-type]
+                         (-> seq-constraint
+                             (c/set-items items-types)
+                             (c/set-tail (either tail-type
+                                                 c/no-tail))
+                             (c/update-path file line)))
+                       read-open-paren
+                       ignore-whitespace
+                       (grmr/get-value 'file-name)
+                       (grmr/get-value 'line-number)
+                       (grmr/any (grmr/all (grmr/ignore "list-as")
+                                           (grmr/always c/list-constraint))
+                                 (grmr/all (grmr/ignore "vector-as")
+                                           (grmr/always c/vect-constraint)))
+                       (apply-to identity
+                                 ;; TODO: should this use 'open-bracker'?
+                                 ignore-whitespace
+                                 (grmr/ignore "[")
+                                 (grmr/none-or-more read-sub-type)
+                                 read-close-bracket)
                        (grmr/optional read-sub-type)
                        read-close-paren)))
 
@@ -731,6 +745,7 @@
                                  read-multi-type
                                  read-map-assertion
                                  read-seq-of
+                                 read-seq-as
                                  read-generic-type
                                  read-type-of-arg-type
                                  read-type-of-result-type
@@ -1450,6 +1465,7 @@
                                                      read-multi-type
                                                      read-map-assertion
                                                      read-seq-of
+                                                     read-seq-as
                                                      read-generic-type
                                                      read-expr)
                                            ignore-whitespace
@@ -1684,6 +1700,7 @@
 
 (def type-literals {"empty-list" empty-list
                     "c/no-symbol" c/no-symbol
+                    "c/no-tail" c/no-tail
                     "c/no-int" c/no-int
                     "c/no-string" c/no-string
                     "c/no-fields" c/no-fields
@@ -1734,6 +1751,9 @@
                        "c/GetField" c/GetField
                        "c/CollectionOf" c/CollectionOf
                        "c/fn-arity" c/fn-arity
+                       "c/intersect" c/intersect
+                       "c/reify-type-constraint" c/reify-type-constraint
+                       "c/extract-items-constraints" c/extract-items-constraints
                        })
 
 (def read-type-constraint
@@ -1775,8 +1795,8 @@
                                  (apply-to identity
                                            (grmr/ignore "[")
                                            (apply-to vec
-                                                     (grmr/none-or-more read-sub-exp-type)
-                                                     read-close-bracket))
+                                                     (grmr/none-or-more read-sub-exp-type))
+                                           read-close-bracket)
                                  (apply-to (fn [q-ast]
                                              (ast/untag (.q-val q-ast)))
                                            read-quoted)
