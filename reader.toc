@@ -1781,8 +1781,10 @@
                        (apply-to (fn [elems]
                                    (reduce elems {} (fn [m [k v]]
                                                       (assoc m k v))))
-                                 (grmr/none-or-more (grmr/all read-integer
+                                 (grmr/none-or-more (grmr/all ignore-whitespace
+                                                              read-integer
                                                               read-type-constraint))
+                                 ignore-whitespace
                                  (grmr/any (grmr/ignore "}")
                                            (grmr/error "Missing \"}\"."))))))
 
