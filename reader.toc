@@ -1783,7 +1783,8 @@
                                    (reduce elems {} (fn [m [k v]]
                                                       (assoc m k v))))
                                  (grmr/none-or-more (grmr/all ignore-whitespace
-                                                              read-integer
+                                                              (grmr/any read-integer
+                                                                        read-type-literal)
                                                               read-type-constraint))
                                  ignore-whitespace
                                  (grmr/any (grmr/ignore "}")
