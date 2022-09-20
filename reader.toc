@@ -11,7 +11,7 @@
 ;; The different types of nodes in the AST
 (add-ns ast (git-dependency "https://github.com/Toccata-Lang/ast.git"
                             "ast.toc"
-                            :sha "12cbba2"))
+                            :sha "1c19a8e"))
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
@@ -1754,6 +1754,7 @@
                        "c/intersect" c/intersect
                        "c/reify-type-constraint" c/reify-type-constraint
                        "c/extract-items-constraints" c/extract-items-constraints
+                       "=" =
                        })
 
 (def read-type-constraint
@@ -1814,7 +1815,14 @@
                        (grmr/get-value 'file-name)
                        (grmr/get-value 'line-number)
                        ignore-whitespace
-                       read-expr
+                       (grmr/any (apply-to (fn [proto-sym type-sym]
+                                             (ast/GetImpl proto-sym (either type-sym c/no-symbol) c/top-type))
+                                           (grmr/ignore "(#impl")
+                                           ignore-whitespace
+                                           read-symbol
+                                           (grmr/optional read-symbol)
+                                           read-close-paren)
+                                 read-expr)
                        read-expected-type
                        read-close-paren)))
 
