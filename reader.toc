@@ -11,11 +11,11 @@
 ;; The different types of nodes in the AST
 (add-ns ast (git-dependency "https://github.com/Toccata-Lang/ast.git"
                             "ast.toc"
-                            :sha "76b9ac7"))
+                            :sha "622e341"))
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
-                          :sha "5bc17d3"))
+                          :sha "3e8d8e7"))
 
 (defn min [x y]
   (either (< x y)
@@ -389,27 +389,11 @@
 (def ListOrVect (any-of c/VectorConstraint
                         c/ListConstraint))
 
-(defn set-items [c items]
-  (apo (fn [c]
-         (cond (instance? ListOrVect c)
-               (RecurseFinal (.items c items))
-
-               (RecurseWith c)))
-       c))
-
-(defn set-tail [c tail]
-  (apo (fn [c]
-         (cond (instance? ListOrVect c)
-               (RecurseFinal (.tail-c c tail))
-
-               (RecurseWith c)))
-       c))
-
 (defn assert-min-count [file-name line-number len]
   ;; TODO: what was I thinking doing it this way. (Actually, I know.)
   (-> c/seq-constraint
-      (set-items (repeat len c/top-type))
-      (set-tail c/coll-of-any)
+      (c/set-items (repeat len c/top-type))
+      (c/set-tail c/coll-of-any)
       (c/update-path file-name line-number)))
 
 ;; TODO: might be useful to have a max count
@@ -469,12 +453,9 @@
 (def read-type-of-result-type
   (grmr/rule "type-of-result"
              (apply-to (fn [file line sym-or-c]
-                         (-> (cond (instance? ast/tagged-symbol sym-or-c)
-                                   (c/ResultOf (ast/untag sym-or-c) empty-list c/no-symbol "")
-
-                                   (c/ComputedConstraint [sym-or-c
-                                                          (c/CallValue c/no-args empty-list c/no-symbol "")]
-                                                         [] empty-list c/no-symbol ""))
+                         (-> (c/ComputedConstraint [sym-or-c
+                                                    (c/CallValue c/no-args empty-list c/no-symbol "")]
+                                                   empty-list c/no-symbol "")
                              (c/update-path file line)))
                        read-open-paren
                        ignore-whitespace
@@ -491,7 +472,7 @@
   (grmr/rule "inner-type-of"
              (apply-to (fn [file line sym]
                          (-> c/inner-type-of-constraint
-                             (.param-sym sym)
+                             (.param sym)
                              (c/update-path file line)))
                        read-open-paren
                        ignore-whitespace
@@ -539,7 +520,7 @@
   (grmr/rule "required-arities"
              (apply-to (fn [file line arg-counts]
                          ;; ! (vector-of Integer) arg-counts
-                         (-> (c/AritiesRequired arg-counts empty-list c/no-symbol "")
+                         (-> (c/FnConstraint arg-counts {} empty-list c/no-symbol "")
                              (c/update-path file line)))
                        read-open-paren
                        ignore-whitespace
@@ -581,7 +562,21 @@
 (def read-multi-type
   (grmr/rule "multi-type"
              (apply-to (fn [type-exprs]
-                         (c/trim (reduce type-exprs c/top-type c/intersect)))
+                         (c/ComputedConstraint type-exprs empty-list c/no-symbol "")
+                         ;; (c/trim (reduce type-exprs c/top-type
+                         ;;                 (fn [ex1 ex2]
+                         ;;                   (let [r1 (c/intersect ex1 ex2)
+                         ;;                         r2 (c/intersect ex2 ex1)]
+                         ;;                     (or (= r1 r2)
+                         ;;                         (do
+                         ;;                           (print-err 'boom _LINE_
+                         ;;                                      "\n" 'ex1 ex1
+                         ;;                                      "\n\n" 'ex2 ex2
+                         ;;                                      "\n\n" 'r1 r1
+                         ;;                                      "\n\n" 'r2 r2)
+                         ;;                           nothing))
+                         ;;                     r1))))
+                         )
                        read-open-paren
                        ignore-whitespace
                        (grmr/ignore "all-of")
@@ -704,13 +699,14 @@
 (def read-seq-type
   (grmr/rule "seq-type"
              (apply-to (fn [base-string file line base-sym]
-                         (-> (either (get seq-assertions base-string)
-                                     (fn [_]
-                                       (print-err "No modified sequence type" (str "'" base-string "'")
-                                                  "exists. At" file ": " line)
-                                       (abort)))
-                             (c/ModSeqType (ast/untag base-sym) empty-list c/no-symbol "")
-                             (c/update-path file line)))
+                         (either (map (get seq-assertions base-string)
+                                      (fn [f]
+                                        (-> (f (ast/untag base-sym) empty-list c/no-symbol "")
+                                            (c/update-path file line))))
+                                 (fn [_]
+                                   (print-err "No modified sequence type" (str "'" base-string "'")
+                                              "exists. At" file ": " line)
+                                   (abort))))
                        read-open-paren
                        ignore-whitespace
                        (apply grmr/any (keys seq-assertions))
@@ -735,7 +731,7 @@
 
 (defn assert-type [type-sym]
    (-> (either (get c/core-type-constraints type-sym)
-               (c/ReifiedConstraint c/UnknownType {} (ast/untag type-sym)
+               (c/ReifiedConstraint c/UnknownType (ast/untag type-sym) {} {}
                                     (.arities c/fn-constraint {}) empty-list c/no-symbol ""))
       (c/update-path (ast/location type-sym))))
 
@@ -803,7 +799,8 @@
 
 (def read-assert-result
   (grmr/rule "assert-result"
-             (grmr/any (apply-to ast/result-expr
+             (grmr/any (apply-to (fn [c]
+                                   (c/update-sym c (ast/untag ast/result-sym)))
                                  read-open-paren
                                  (grmr/ignore "assert-result")
                                  (grmr/ignore (grmr/one-or-more whitespace))
@@ -1742,18 +1739,15 @@
                        "c/ReifiedConstraint" c/ReifiedConstraint
                        "c/SumConstraint" c/SumConstraint
                        "c/ComputedConstraint" c/ComputedConstraint
-                       "c/ModSeqType" c/ModSeqType
                        "c/ArgOf" c/ArgOf
-                       "c/ResultOf" c/RestOf
-                       "c/AritiesRequired" c/AritiesRequired
                        "c/CallValue" c/CallValue
-                       "c/SetField" c/SetField
-                       "c/GetField" c/GetField
+                       "c/SetTo" c/SetTo
+                       "c/GetFrom" c/GetFrom
                        "c/CollectionOf" c/CollectionOf
                        "c/fn-arity" c/fn-arity
                        "c/intersect" c/intersect
                        "c/reify-type-constraint" c/reify-type-constraint
-                       "c/extract-items-constraints" c/extract-items-constraints
+                       "c/extract-items" c/extract-items
                        "=" =
                        })
 
