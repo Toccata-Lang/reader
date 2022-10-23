@@ -11,11 +11,11 @@
 ;; The different types of nodes in the AST
 (add-ns ast (git-dependency "https://github.com/Toccata-Lang/ast.git"
                             "ast.toc"
-                            :sha "d212d10"))
+                            :sha "4790bf9"))
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
-                          :sha "3b6ed29"))
+                          :sha "e6e0410"))
 
 (defn min [x y]
   (either (< x y)
@@ -703,7 +703,7 @@
                                       (fn [f]
                                         (-> (f (ast/untag base-sym) empty-list c/no-symbol "")
                                             (c/update-path file line))))
-                                 (fn [_]
+                                 (do
                                    (print-err "No modified sequence type" (str "'" base-string "'")
                                               "exists. At" file ": " line)
                                    (abort))))
