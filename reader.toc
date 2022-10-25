@@ -11,11 +11,11 @@
 ;; The different types of nodes in the AST
 (add-ns ast (git-dependency "https://github.com/Toccata-Lang/ast.git"
                             "ast.toc"
-                            :sha "f830bb6"))
+                            :sha "8447781"))
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
-                          :sha "7c7dce7"))
+                          :sha "89282ae"))
 
 (defn min [x y]
   (either (< x y)
@@ -426,7 +426,7 @@
                        (grmr/ignore "max")
                        (grmr/ignore (grmr/one-or-more whitespace))
                        (grmr/any read-integer
-                                 (grmr/error "The 'max' expression must contain an integer maximum value."))
+                                 (grmr/error "The 'max' expression must contain an maximum integer value."))
                        read-close-paren)))
 
 (defn assert-min-value [file-name line-number min]
@@ -444,7 +444,7 @@
                        (grmr/ignore "min-value")
                        (grmr/ignore (grmr/one-or-more whitespace))
                        (grmr/any read-integer
-                                 (grmr/error "The 'min' expression must contain an integer minimum value."))
+                                 (grmr/error "The 'min' expression must contain an minimum integer value."))
                        read-close-paren)))
 
 (def read-sub-type
@@ -1746,7 +1746,6 @@
                        "c/fn-arity" c/fn-arity
                        "c/intersect" c/intersect
                        "c/reify-type-constraint" c/reify-type-constraint
-                       "c/extract-items" c/extract-items
                        "=" =
                        })
 
