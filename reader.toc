@@ -11,11 +11,11 @@
 ;; The different types of nodes in the AST
 (add-ns ast (git-dependency "https://github.com/Toccata-Lang/ast.git"
                             "ast.toc"
-                            :sha "8447781"))
+                            :sha "7938e6a"))
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
-                          :sha "89282ae"))
+                          :sha "6895c3d"))
 
 (defn min [x y]
   (either (< x y)
@@ -452,9 +452,8 @@
 
 (def read-type-of-result-type
   (grmr/rule "type-of-result"
-             (apply-to (fn [file line sym-or-c]
-                         (-> (c/ComputedConstraint [sym-or-c
-                                                    (c/CallValue c/no-args empty-list c/no-symbol "")]
+             (apply-to (fn [file line c]
+                         (-> (c/ComputedConstraint [c (c/CallValue c/no-args empty-list c/no-symbol "")]
                                                    empty-list c/no-symbol "")
                              (c/update-path file line)))
                        read-open-paren
@@ -463,7 +462,9 @@
                        (grmr/get-value 'file-name)
                        (grmr/get-value 'line-number)
                        ignore-whitespace
-                       (grmr/any read-symbol
+                       (grmr/any (apply-to (fn [sym]
+                                             (c/TypeOfConstraint sym empty-list c/no-symbol ""))
+                                           read-symbol)
                                  read-sub-type
                                  (grmr/error "Invalid type expression"))
                        read-close-paren)))
@@ -1703,7 +1704,10 @@
                     "c/no-args" c/no-args
                     "c/variadic" c/variadic
                     "c/top-type" c/top-type
-                    "c/bottom-type" c/bottom-type})
+                    "c/bottom-type" c/bottom-type
+                    "c/fn-constraint" c/fn-constraint
+                    "c/int-constraint" c/int-constraint
+                    "c/maybe-constraint" c/maybe-constraint})
 
 (def read-type-literal
   (grmr/rule "type-literal"
