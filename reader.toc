@@ -781,7 +781,7 @@
                                            read-show-type
                                            (grmr/error "Missing type assertion in 'assert' expression."))
                                  read-close-paren)
-                       (apply-to (fn [c sym]
+                       (apply-to (fn [sym c]
                                    (assert (instance? c/SymbolConstraints c))
                                    (-> c
                                        (c/update-path (ast/location sym))
@@ -790,10 +790,10 @@
                                  (grmr/ignore "!")
                                  (grmr/ignore (grmr/any " " read-string-tab))
                                  ignore-whitespace
+                                 read-symbol
+                                 ignore-whitespace
                                  (grmr/any read-type-expr
                                            (grmr/error "Missing type assertion in 'assert-result' expression."))
-                                 ignore-whitespace
-                                 read-symbol
                                  (grmr/ignore (grmr/none-or-more not-eol))
                                  (grmr/ignore newline)))))
 
