@@ -11,11 +11,11 @@
 ;; The different types of nodes in the AST
 (add-ns ast (git-dependency "https://github.com/Toccata-Lang/ast.git"
                             "ast.toc"
-                            :sha "795423a"))
+                            :sha "89d2d5a"))
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
-                          :sha "ba4614a"))
+                          :sha "9488a17"))
 
 (defn min [x y]
   (either (< x y)
@@ -504,8 +504,9 @@
 
 (def read-type-of-arg-type
   (grmr/rule "type-of-arg"
-             (apply-to (fn [file line sym arg-pos]
-                         (-> (c/ArgOf (ast/untag sym) (.int arg-pos) empty-list c/no-symbol "")
+             (apply-to (fn [file line c arg-pos]
+                         (-> (c/ComputedConstraint [c (c/ArgOf (.int arg-pos) empty-list c/no-symbol "")]
+                                                   empty-list c/no-symbol "")
                              (c/update-path file line)))
                        read-open-paren
                        ignore-whitespace
@@ -513,7 +514,9 @@
                        (grmr/get-value 'file-name)
                        (grmr/get-value 'line-number)
                        ignore-whitespace
-                       read-symbol
+                       (apply-to (fn [sym]
+                                   (c/TypeOfConstraint sym empty-list c/no-symbol ""))
+                                 read-symbol)
                        ignore-whitespace
                        read-integer-literal
                        read-close-paren)))
@@ -700,10 +703,11 @@
 
 (def read-seq-type
   (grmr/rule "seq-type"
-             (apply-to (fn [base-string file line base-sym]
+             (apply-to (fn [base-string file line c]
                          (either (map (get seq-assertions base-string)
                                       (fn [f]
-                                        (-> (f (ast/untag base-sym) empty-list c/no-symbol "")
+                                        (-> (c/ComputedConstraint [c (f empty-list c/no-symbol "")]
+                                                                  empty-list c/no-symbol "")
                                             (c/update-path file line))))
                                  (do
                                    (print-err "No modified sequence type" (str "'" base-string "'")
@@ -715,7 +719,9 @@
                        (grmr/get-value 'file-name)
                        (grmr/get-value 'line-number)
                        ignore-whitespace
-                       read-symbol
+                       (apply-to (fn [sym]
+                                   (c/TypeOfConstraint sym empty-list c/no-symbol ""))
+                                 read-symbol)
                        read-close-paren)))
 
 (def read-show-type
