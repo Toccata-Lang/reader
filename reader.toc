@@ -11,11 +11,11 @@
 ;; The different types of nodes in the AST
 (add-ns ast (git-dependency "https://github.com/Toccata-Lang/ast.git"
                             "ast.toc"
-                            :sha "89d2d5a"))
+                            :sha "7358543"))
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
-                          :sha "9488a17"))
+                          :sha "196bf47"))
 
 (defn min [x y]
   (either (< x y)
@@ -453,7 +453,7 @@
 (def read-type-of-result-type
   (grmr/rule "type-of-result"
              (apply-to (fn [file line c]
-                         (-> (c/ComputedConstraint [c (c/CallValue c/no-args empty-list c/no-symbol "")]
+                         (-> (c/ComputedConstraint [c (c/TypeOp c/call-value c/no-args empty-list c/no-symbol "")]
                                                    empty-list c/no-symbol "")
                              (c/update-path file line)))
                        read-open-paren
@@ -505,7 +505,7 @@
 (def read-type-of-arg-type
   (grmr/rule "type-of-arg"
              (apply-to (fn [file line c arg-pos]
-                         (-> (c/ComputedConstraint [c (c/ArgOf (.int arg-pos) empty-list c/no-symbol "")]
+                         (-> (c/ComputedConstraint [c (c/TypeOp c/arg-of (.int arg-pos) empty-list c/no-symbol "")]
                                                    empty-list c/no-symbol "")
                              (c/update-path file line)))
                        read-open-paren
@@ -1718,7 +1718,18 @@
                     "c/bottom-type" c/bottom-type
                     "c/fn-constraint" c/fn-constraint
                     "c/int-constraint" c/int-constraint
-                    "c/maybe-constraint" c/maybe-constraint})
+                    "c/maybe-constraint" c/maybe-constraint
+                    "c/inner-type-of-constraint" c/inner-type-of-constraint
+                    "c/list-from" c/list-from
+                    "c/vect-from" c/vect-from
+                    "c/arg-of" c/arg-of
+                    "c/call-value" c/call-value
+                    "c/first-of" c/first-of
+                    "c/last-of" c/last-of
+                    "c/rest-of" c/rest-of
+                    "c/butlast-of" c/butlast-of
+                    "c/get-from-op" c/get-from-op
+                    "c/set-to-op" c/set-to-op})
 
 (def read-type-literal
   (grmr/rule "type-literal"
@@ -1740,7 +1751,6 @@
                        "c/MaybeConstraint" c/MaybeConstraint
                        "c/IntegerConstraint" c/IntegerConstraint
                        "c/TypeOfConstraint" c/TypeOfConstraint
-                       "c/InnerTypeOfConstraint" c/InnerTypeOfConstraint
                        "c/SymbolConstraint" c/SymbolConstraint
                        "c/StrBuffConstraint" c/StrBuffConstraint
                        "c/SubStrConstraint" c/SubStrConstraint
@@ -1753,11 +1763,8 @@
                        "c/ReifiedConstraint" c/ReifiedConstraint
                        "c/SumConstraint" c/SumConstraint
                        "c/ComputedConstraint" c/ComputedConstraint
-                       "c/ArgOf" c/ArgOf
-                       "c/CallValue" c/CallValue
-                       "c/SetTo" c/SetTo
-                       "c/GetFrom" c/GetFrom
                        "c/CollectionOf" c/CollectionOf
+                       "c/TypeOp" c/TypeOp
                        "c/fn-arity" c/fn-arity
                        "c/intersect" c/intersect
                        "c/reify-type-constraint" c/reify-type-constraint
