@@ -304,7 +304,7 @@
                        read-close-bracket)))
 
 (def read-destructure
-  (grmr/recursive-rule "destructure"
+  (grmr/recursive-rule read-sub-dest
                        (grmr/any read-list-destructure
                                  read-arg)))
 
@@ -744,7 +744,7 @@
       (c/update-path (ast/location type-sym))))
 
 (def read-type-expr
-  (grmr/recursive-rule "type-expr"
+  (grmr/recursive-rule read-sub-type
                        (grmr/any read-sum-type
                                  read-multi-type
                                  read-map-assertion
@@ -1119,20 +1119,20 @@
                           (map quoted-vect quote-literal)
                           c/top-type))))
 
+(def quoted-value (grmr/recurse "quoted-value"))
+
 (def read-quoted-value
-  (grmr/recursive-rule "quoted-value"
+  (grmr/recursive-rule quoted-value
                        (apply-to identity
                                  ignore-whitespace
                                  (grmr/any (apply-to identity
                                                      read-open-paren
-                                                     (grmr/none-or-more
-                                                      (grmr/recurse "quoted-value"))
+                                                     (grmr/none-or-more quoted-value)
                                                      read-close-paren)
                                            (apply-to (fn [xs]
                                                        (cons 'vector (seq xs)))
                                                      (grmr/ignore "[")
-                                                     (grmr/one-or-more
-                                                      (grmr/recurse "quoted-value"))
+                                                     (grmr/one-or-more quoted-value)
                                                      read-close-bracket)
                                            read-integer-literal
                                            read-string-literal
@@ -1409,7 +1409,7 @@
                        read-close-paren)))
 
 (def read-expr
-  (grmr/recursive-rule "expr"
+  (grmr/recursive-rule read-sub-expr
                        (apply-to identity
                                  ignore-whitespace
                                  (grmr/any read-integer-literal
@@ -1825,7 +1825,7 @@
                                            (grmr/error "Missing \"}\"."))))))
 
 (def read-expected-type
-  (grmr/recursive-rule "expected-type"
+  (grmr/recursive-rule read-sub-exp-type
                        (grmr/any read-type-literal
                                  read-integer
                                  read-string
@@ -1862,24 +1862,24 @@
                        read-close-paren)))
 
 (def top-level
-  (grmr/recursive-rule "top-level"
-                       (apply-to identity
-                                 ignore-whitespace
-                                 (grmr/catch-error
-                                  output-error
-                                  (grmr/any read-defn
-                                            read-def
-                                            read-defprotocol
-                                            read-deftype
-                                            read-extend-type
-                                            read-block-comment
-                                            read-main
-                                            read-JS-callable
-                                            read-inline
-                                            read-add-ns
-                                            read-show-type
-                                            read-is-type
-                                            shebang
-                                            bad-expr
-                                            ;; TODO: detect end of input
-                                            )))))
+  (grmr/rule "top-level"
+             (apply-to identity
+                       ignore-whitespace
+                       (grmr/catch-error
+                        output-error
+                        (grmr/any read-defn
+                                  read-def
+                                  read-defprotocol
+                                  read-deftype
+                                  read-extend-type
+                                  read-block-comment
+                                  read-main
+                                  read-JS-callable
+                                  read-inline
+                                  read-add-ns
+                                  read-show-type
+                                  read-is-type
+                                  shebang
+                                  bad-expr
+                                  ;; TODO: detect end of input
+                                  )))))
