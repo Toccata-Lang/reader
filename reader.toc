@@ -6,12 +6,12 @@
 ;; Components to build the grammar out of
 (add-ns grmr (git-dependency "https://github.com/Toccata-Lang/grammar.git"
                              "grammar.toc"
-                             :sha "4846add"))
+                             :sha "16944a7"))
 
 ;; The different types of nodes in the AST
 (add-ns ast (git-dependency "https://github.com/Toccata-Lang/ast.git"
                             "ast.toc"
-                            :sha "d060754"))
+                            :sha "46763d8"))
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
@@ -36,7 +36,7 @@
 
 (def symbol-punct
   (grmr/rule "symbol-punct"
-               (grmr/one-of "._<>=+-*/?")))
+               (grmr/one-of "._<>=+-*?")))
 
 (def symbol-char
   (grmr/rule "symbol-char"
@@ -52,9 +52,9 @@
 
 (def rest-of-namespace
   (grmr/rule "rest-of-namespace"
-               (grmr/none-or-more (grmr/any grmr/alpha
-                                                grmr/digit
-                                                namespace-punct))))
+             (grmr/none-or-more (grmr/any grmr/alpha
+                                          grmr/digit
+                                          namespace-punct))))
 
 (def read-namespace
   (grmr/rule "namespace"
@@ -67,9 +67,10 @@
 (def read-symbol
   (grmr/rule "tagged-symbol"
              (apply-to (fn [file-name line-number ns start the-rest]
-                         (let [ns-prefix (either (map ns (fn [ns]
-                                                           (str ns "/")))
-                                                 "")]
+                         (let [ns-prefix (cond (= c/no-symbol ns)
+                                               ""
+
+                                               (str ns "/"))]
                            (ast/tagged-symbol ns
                                               (symbol (to-str (comp [start] the-rest)))
                                               (symbol (to-str (comp (list ns-prefix start)
@@ -77,7 +78,7 @@
                                               file-name line-number c/top-type)))
                        (grmr/get-value 'file-name)
                        (grmr/get-value 'line-number)
-                       (grmr/optional read-namespace)
+                       (grmr/optional read-namespace c/no-symbol)
                        symbol-start
                        rest-of-symbol)))
 
@@ -229,13 +230,12 @@
                        (grmr/get-value 'file-name)
                        (grmr/get-value 'line-number)
                        (grmr/one-or-more
-                        (apply-to identity
+                        (apply-to to-str
                                   (grmr/ignore (grmr/none-or-more (grmr/any linear-whitespace
                                                                             "\r"
                                                                             newline)))
                                   (grmr/ignore (grmr/one-or-more ";"))
-                                  (apply-to to-str
-                                            (grmr/none-or-more not-eol))
+                                  (grmr/none-or-more not-eol)
                                   (grmr/ignore newline))))))
 
 (def whitespace
@@ -304,9 +304,9 @@
                        read-close-bracket)))
 
 (def read-destructure
-  (grmr/recursive-rule read-sub-dest
-                       (grmr/any read-list-destructure
-                                 read-arg)))
+  (grmr/rule read-sub-dest
+             (grmr/any read-list-destructure
+                       read-arg)))
 
 (def read-let-binding
   (grmr/rule "let-binding"
@@ -744,25 +744,25 @@
       (c/update-path (ast/location type-sym))))
 
 (def read-type-expr
-  (grmr/recursive-rule read-sub-type
-                       (grmr/any read-sum-type
-                                 read-multi-type
-                                 read-map-assertion
-                                 read-seq-of
-                                 read-seq-as
-                                 read-generic-type
-                                 read-type-of-arg-type
-                                 read-type-of-result-type
-                                 read-required-arities
-                                 read-type-of-type
-                                 read-min-count-assertion
-                                 read-min-val-assertion
-                                 read-max-val-assertion
-                                 read-inner-type-of-type
-                                 read-seq-type
-                                 (apply-to assert-type
-                                           ignore-whitespace
-                                           read-symbol))))
+  (grmr/rule read-sub-type
+             (grmr/any read-sum-type
+                       read-multi-type
+                       read-map-assertion
+                       read-seq-of
+                       read-seq-as
+                       read-generic-type
+                       read-type-of-arg-type
+                       read-type-of-result-type
+                       read-required-arities
+                       read-type-of-type
+                       read-min-count-assertion
+                       read-min-val-assertion
+                       read-max-val-assertion
+                       read-inner-type-of-type
+                       read-seq-type
+                       (apply-to assert-type
+                                 ignore-whitespace
+                                 read-symbol))))
 
 (def read-type-assertion
   (grmr/rule "assertion-type"
@@ -1122,22 +1122,22 @@
 (def quoted-value (grmr/recurse "quoted-value"))
 
 (def read-quoted-value
-  (grmr/recursive-rule quoted-value
-                       (apply-to identity
-                                 ignore-whitespace
-                                 (grmr/any (apply-to identity
-                                                     read-open-paren
-                                                     (grmr/none-or-more quoted-value)
-                                                     read-close-paren)
-                                           (apply-to (fn [xs]
-                                                       (cons 'vector (seq xs)))
-                                                     (grmr/ignore "[")
-                                                     (grmr/one-or-more quoted-value)
-                                                     read-close-bracket)
-                                           read-integer-literal
-                                           read-string-literal
-                                           read-symbol)
-                                 ignore-whitespace)))
+  (grmr/rule quoted-value
+             (apply-to identity
+                       ignore-whitespace
+                       (grmr/any (apply-to identity
+                                           read-open-paren
+                                           (grmr/none-or-more quoted-value)
+                                           read-close-paren)
+                                 (apply-to (fn [xs]
+                                             (cons 'vector (seq xs)))
+                                           (grmr/ignore "[")
+                                           (grmr/one-or-more quoted-value)
+                                           read-close-bracket)
+                                 read-integer-literal
+                                 read-string-literal
+                                 read-symbol)
+                       ignore-whitespace)))
 
 (def read-quoted
   (grmr/rule "quoted"
@@ -1409,36 +1409,36 @@
                        read-close-paren)))
 
 (def read-expr
-  (grmr/recursive-rule read-sub-expr
-                       (apply-to identity
-                                 ignore-whitespace
-                                 (grmr/any read-integer-literal
-                                           read-string-literal
-                                           curr-file-name
-                                           curr-line
-                                           read-symbol
-                                           read-quoted
-                                           read-or
-                                           read-and
-                                           read-either
-                                           read-cond
-                                           read-fn
-                                           read-let
-                                           read-do
-                                           read-apply-to
-                                           read-reify
-                                           read-vector
-                                           read-hash-map
-                                           read-hash-set
-                                           read-for
-                                           read-threading
-                                           read-assert
-                                           read-assert-result
-                                           (grmr/all read-inline
-                                                     (grmr/error "'inline' expressions not allowed here."))
-                                           read-call
-                                           read-block-comment)
-                                 ignore-whitespace)))
+  (grmr/rule read-sub-expr
+             (apply-to identity
+                       ignore-whitespace
+                       (grmr/any read-integer-literal
+                                 read-string-literal
+                                 curr-file-name
+                                 curr-line
+                                 read-symbol
+                                 read-quoted
+                                 read-or
+                                 read-and
+                                 read-either
+                                 read-cond
+                                 read-fn
+                                 read-let
+                                 read-do
+                                 read-apply-to
+                                 read-reify
+                                 read-vector
+                                 read-hash-map
+                                 read-hash-set
+                                 read-for
+                                 read-threading
+                                 read-assert
+                                 read-assert-result
+                                 (grmr/all read-inline
+                                           (grmr/error "'inline' expressions not allowed here."))
+                                 read-call
+                                 read-block-comment)
+                       ignore-whitespace)))
 
 (def read-main
   (grmr/rule "main"
@@ -1651,40 +1651,40 @@
                                            read-close-paren)
                                  (grmr/error "Invalid 'module' expression")))))
 
-(defn output-error [error curr-state]
-  (either (or (for [file (get-in error [.state .values 'file-name])
-                    line (get-in error [.state .values 'line-number])
-                    expr-line (get-in curr-state [.values 'line-number])]
-                (do
-                  (.val error (str (.val error) " At " file ": " line "."
-                                   (cond (= line expr-line) ""
-                                         (str "\n In expression at line " (str expr-line ".")))))))
-              (for [file (get-in error [.state .values 'file-name])
-                    expr-line (get-in curr-state [.values 'line-number])]
-                (.val error (str (.val error) " At " file ": " expr-line "."))))
-          error))
+;; (defn output-error [error curr-state]
+;;   (either (or (for [file (get-in error [.state .values 'file-name])
+;;                     line (get-in error [.state .values 'line-number])
+;;                     expr-line (get-in curr-state [.values 'line-number])]
+;;                 (do
+;;                   (.val error (str (.val error) " At " file ": " line "."
+;;                                    (cond (= line expr-line) ""
+;;                                          (str "\n In expression at line " (str expr-line ".")))))))
+;;               (for [file (get-in error [.state .values 'file-name])
+;;                     expr-line (get-in curr-state [.values 'line-number])]
+;;                 (.val error (str (.val error) " At " file ": " expr-line "."))))
+;;           error))
 
 (def read-add-ns
   (grmr/rule
    "add-ns"
    (apply-to identity
              ignore-whitespace
-             (grmr/catch-error
-              output-error
-              (apply-to identity
-                        read-open-paren
-                        (grmr/ignore "add-ns")
-                        (grmr/any (apply-to ast/ns-add
-                                            (grmr/ignore
-                                             (grmr/one-or-more whitespace))
-                                            (grmr/any read-symbol
-                                                      (grmr/error "Missing or invalid namespace symbol"))
-                                            (grmr/any read-module-spec
-                                                      read-git-dep-spec
-                                                      (grmr/error "Missing or invalid namespace"
-                                                                  "specification"))
-                                            read-close-paren)
-                                  (grmr/error "Invalid 'add-ns' expression")))))))
+             ;; (grmr/catch-error
+             ;;  output-error)
+             (apply-to identity
+                       read-open-paren
+                       (grmr/ignore "add-ns")
+                       (grmr/any (apply-to ast/ns-add
+                                           (grmr/ignore
+                                            (grmr/one-or-more whitespace))
+                                           (grmr/any read-symbol
+                                                     (grmr/error "Missing or invalid namespace symbol"))
+                                           (grmr/any read-module-spec
+                                                     read-git-dep-spec
+                                                     (grmr/error "Missing or invalid namespace"
+                                                                 "specification"))
+                                           read-close-paren)
+                                 (grmr/error "Invalid 'add-ns' expression"))))))
 
 (def bad-expr
   (grmr/rule "bad-expr"
@@ -1825,20 +1825,20 @@
                                            (grmr/error "Missing \"}\"."))))))
 
 (def read-expected-type
-  (grmr/recursive-rule read-sub-exp-type
-                       (grmr/any read-type-literal
-                                 read-integer
-                                 read-string
-                                 read-arity-map
-                                 (apply-to identity
-                                           (grmr/ignore "[")
-                                           (apply-to vec
-                                                     (grmr/none-or-more read-sub-exp-type))
-                                           read-close-bracket)
-                                 (apply-to (fn [q-ast]
-                                             (ast/untag (.q-val q-ast)))
-                                           read-quoted)
-                                 read-type-constraint)))
+  (grmr/rule read-sub-exp-type
+             (grmr/any read-type-literal
+                       read-integer
+                       read-string
+                       read-arity-map
+                       (apply-to identity
+                                 (grmr/ignore "[")
+                                 (apply-to vec
+                                           (grmr/none-or-more read-sub-exp-type))
+                                 read-close-bracket)
+                       (apply-to (fn [q-ast]
+                                   (ast/untag (.q-val q-ast)))
+                                 read-quoted)
+                       read-type-constraint)))
 
 (def read-is-type
   (grmr/rule "is-type"
@@ -1865,21 +1865,21 @@
   (grmr/rule "top-level"
              (apply-to identity
                        ignore-whitespace
-                       (grmr/catch-error
-                        output-error
-                        (grmr/any read-defn
-                                  read-def
-                                  read-defprotocol
-                                  read-deftype
-                                  read-extend-type
-                                  read-block-comment
-                                  read-main
-                                  read-JS-callable
-                                  read-inline
-                                  read-add-ns
-                                  read-show-type
-                                  read-is-type
-                                  shebang
-                                  bad-expr
-                                  ;; TODO: detect end of input
-                                  )))))
+                       ;; (grmr/catch-error
+                       ;;  output-error)
+                       (grmr/any read-defn
+                                 read-def
+                                 read-defprotocol
+                                 read-deftype
+                                 read-extend-type
+                                 read-block-comment
+                                 read-main
+                                 read-JS-callable
+                                 read-inline
+                                 read-add-ns
+                                 read-show-type
+                                 read-is-type
+                                 shebang
+                                 bad-expr
+                                 ;; TODO: detect end of input
+                                 ))))
