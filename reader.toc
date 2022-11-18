@@ -6,16 +6,16 @@
 ;; Components to build the grammar out of
 (add-ns grmr (git-dependency "https://github.com/Toccata-Lang/grammar.git"
                              "grammar.toc"
-                             :sha "4b49f11"))
+                             :sha "e8eba87"))
 
 ;; The different types of nodes in the AST
 (add-ns ast (git-dependency "https://github.com/Toccata-Lang/ast.git"
                             "ast.toc"
-                            :sha "c57ce97"))
+                            :sha "241b256"))
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
-                          :sha "593be5e"))
+                          :sha "0f848e9"))
 
 (defn min [x y]
   (either (< x y)
@@ -525,7 +525,7 @@
   (grmr/rule "required-arities"
              (apply-to (fn [file line arg-counts]
                          ;; ! (vector-of Integer) arg-counts
-                         (-> (c/FnConstraint arg-counts {} empty-list c/no-symbol "")
+                         (-> (c/FnConstraint (vec arg-counts) {} empty-list c/no-symbol "")
                              (c/update-path file line)))
                        read-open-paren
                        ignore-whitespace
@@ -673,7 +673,7 @@
   (grmr/rule "seq-as"
              (apply-to (fn [file line [seq-constraint] items-types tail-type]
                          (-> seq-constraint
-                             (c/set-items items-types)
+                             (c/set-items (vec items-types))
                              (c/set-tail (either tail-type
                                                  c/no-tail))
                              (c/update-path file line)))
@@ -781,53 +781,33 @@
 
 (def read-assert
   (grmr/rule "assert"
-             (grmr/any (apply-to identity
-                                 read-open-paren
-                                 (grmr/ignore "assert")
-                                 (grmr/ignore (grmr/one-or-more whitespace))
-                                 (grmr/any read-type-assertion
-                                           read-show-type
-                                           (grmr/error "Missing type assertion in 'assert' expression."))
-                                 read-close-paren)
-                       (apply-to (fn [sym c]
-                                   (assert (instance? c/SymbolConstraints c))
-                                   (-> c
-                                       (c/update-path (ast/location sym))
-                                       (c/update-sym (ast/untag sym))))
-                                 ignore-whitespace
-                                 (grmr/ignore "!")
-                                 (grmr/ignore (grmr/any " " read-string-tab))
-                                 ignore-whitespace
-                                 read-symbol
-                                 ignore-whitespace
-                                 (grmr/any read-type-expr
-                                           (grmr/error "Missing type assertion in 'assert-result' expression."))
-                                 (grmr/ignore (grmr/none-or-more not-eol))
-                                 (grmr/ignore newline)))))
+             (apply-to (fn [sym c]
+                         (assert (instance? c/SymbolConstraints c))
+                         (-> c
+                             (c/update-path (ast/location sym))
+                             (c/update-sym (ast/untag sym))))
+                       ignore-whitespace
+                       (grmr/ignore "!")
+                       (grmr/ignore (grmr/any " " read-string-tab))
+                       ignore-whitespace
+                       read-symbol
+                       ignore-whitespace
+                       (grmr/any read-type-expr
+                                 (grmr/error "Missing type assertion in 'assert-result' expression."))
+                       (grmr/ignore (grmr/none-or-more not-eol))
+                       (grmr/ignore newline))))
 
 (def read-assert-result
   (grmr/rule "assert-result"
-             (grmr/any (apply-to (fn [c]
-                                   (c/update-sym c (ast/untag ast/result-sym)))
-                                 read-open-paren
-                                 (grmr/ignore "assert-result")
-                                 (grmr/ignore (grmr/one-or-more whitespace))
-                                 (grmr/ignore (grmr/optional read-symbol))
-                                 (grmr/ignore (grmr/one-or-more whitespace))
-                                 (grmr/any read-type-assertion
-                                           read-show-type
-                                           read-seq-type
-                                           (grmr/error "Missing type assertion in 'assert-result' expression."))
-                                 read-close-paren)
-                       (apply-to (fn [c]
-                                   (c/update-sym c (ast/untag ast/result-sym)))
-                                 ignore-whitespace
-                                 (grmr/ignore "!returns")
-                                 ignore-whitespace
-                                 (grmr/any read-type-expr
-                                           (grmr/error "Missing type assertion in 'assert-result' expression."))
-                                 (grmr/ignore (grmr/none-or-more not-eol))
-                                 (grmr/ignore newline)))))
+             (apply-to (fn [c]
+                         (c/update-sym c (ast/untag ast/result-sym)))
+                       ignore-whitespace
+                       (grmr/ignore "!returns")
+                       ignore-whitespace
+                       (grmr/any read-type-expr
+                                 (grmr/error "Missing type assertion in 'assert-result' expression."))
+                       (grmr/ignore (grmr/none-or-more not-eol))
+                       (grmr/ignore newline))))
 
 (def read-apply-to
   (grmr/rule "apply-to"
@@ -890,13 +870,13 @@
 
 (def read-inline-body
   (grmr/rule "read-inline-body"
-             (apply-to comp
+             (apply-to conj
                        (grmr/none-or-more (grmr/any read-assert
                                                     read-assert-result
                                                     read-block-comment))
                        ignore-whitespace
-                       (grmr/all read-inline)
-                       (grmr/none-or-more read-block-comment))))
+                       read-inline
+                       (grmr/ignore (grmr/none-or-more read-block-comment)))))
 
 (def read-fn-doc
   (grmr/rule "fn-doc"
@@ -1506,19 +1486,22 @@
                        (grmr/any (apply-to
                                   (fn [sym prototypes]
                                     (ast/protocol
-                                     sym (remove prototypes (partial instance? ast/NoCode))))
+                                     sym (-> prototypes
+                                             (remove (partial instance? ast/NoCode))
+                                             vec)))
                                   (grmr/any read-symbol
                                             (grmr/error "'defprotocol' must be followed by"
                                                         "the name of the protocol."))
                                   ;; TODO: much too complex. should be
                                   ;; (grmr/none-or-more read-prototype)
                                   ;; but this gives better error messages
-                                  (apply-to comp*
+                                  (apply-to (fn [comms protos]
+                                              (comp* comms (seq protos)))
                                             (grmr/none-or-more read-block-comment)
                                             (grmr/all (grmr/any (grmr/one-or-more read-prototype)
                                                                 (grmr/error "A protocol definition must"
-                                                                            "contain at least one"
-                                                                            "prototype function defintion."))
+                                                                            "contain at least one prototype"
+                                                                            "function defintion."))
                                                       (grmr/none-or-more
                                                        (grmr/any read-prototype
                                                                  read-block-comment))))
@@ -1832,8 +1815,7 @@
                        read-arity-map
                        (apply-to identity
                                  (grmr/ignore "[")
-                                 (apply-to vec
-                                           (grmr/none-or-more read-sub-exp-type))
+                                 (grmr/none-or-more read-sub-exp-type)
                                  read-close-bracket)
                        (apply-to (fn [q-ast]
                                    (ast/untag (.q-val q-ast)))
