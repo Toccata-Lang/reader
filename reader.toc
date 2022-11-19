@@ -780,33 +780,53 @@
 
 (def read-assert
   (grmr/rule "assert"
-             (apply-to (fn [sym c]
-                         (assert (instance? c/SymbolConstraints c))
-                         (-> c
-                             (c/update-path (ast/location sym))
-                             (c/update-sym (ast/untag sym))))
-                       ignore-whitespace
-                       (grmr/ignore "!")
-                       (grmr/ignore (grmr/any " " read-string-tab))
-                       ignore-whitespace
-                       read-symbol
-                       ignore-whitespace
-                       (grmr/any read-type-expr
-                                 (grmr/error "Missing type assertion in 'assert-result' expression."))
-                       (grmr/ignore (grmr/none-or-more not-eol))
-                       (grmr/ignore newline))))
+             (grmr/any (apply-to identity
+                                 read-open-paren
+                                 (grmr/ignore "assert")
+                                 (grmr/ignore (grmr/one-or-more whitespace))
+                                 (grmr/any read-type-assertion
+                                           read-show-type
+                                           (grmr/error "Missing type assertion in 'assert' expression."))
+                                 read-close-paren)
+                       (apply-to (fn [sym c]
+                                   (assert (instance? c/SymbolConstraints c))
+                                   (-> c
+                                       (c/update-path (ast/location sym))
+                                       (c/update-sym (ast/untag sym))))
+                                 ignore-whitespace
+                                 (grmr/ignore "!")
+                                 (grmr/ignore (grmr/any " " read-string-tab))
+                                 ignore-whitespace
+                                 read-symbol
+                                 ignore-whitespace
+                                 (grmr/any read-type-expr
+                                           (grmr/error "Missing type assertion in 'assert-result' expression."))
+                                 (grmr/ignore (grmr/none-or-more not-eol))
+                                 (grmr/ignore newline)))))
 
 (def read-assert-result
   (grmr/rule "assert-result"
-             (apply-to (fn [c]
-                         (c/update-sym c (ast/untag ast/result-sym)))
-                       ignore-whitespace
-                       (grmr/ignore "!returns")
-                       ignore-whitespace
-                       (grmr/any read-type-expr
-                                 (grmr/error "Missing type assertion in 'assert-result' expression."))
-                       (grmr/ignore (grmr/none-or-more not-eol))
-                       (grmr/ignore newline))))
+             (grmr/any (apply-to (fn [c]
+                                   (c/update-sym c (ast/untag ast/result-sym)))
+                                 read-open-paren
+                                 (grmr/ignore "assert-result")
+                                 (grmr/ignore (grmr/one-or-more whitespace))
+                                 (grmr/ignore (grmr/optional read-symbol))
+                                 (grmr/ignore (grmr/one-or-more whitespace))
+                                 (grmr/any read-type-assertion
+                                           read-show-type
+                                           read-seq-type
+                                           (grmr/error "Missing type assertion in 'assert-result' expression."))
+                                 read-close-paren)
+                       (apply-to (fn [c]
+                                   (c/update-sym c (ast/untag ast/result-sym)))
+                                 ignore-whitespace
+                                 (grmr/ignore "!returns")
+                                 ignore-whitespace
+                                 (grmr/any read-type-expr
+                                           (grmr/error "Missing type assertion in 'assert-result' expression."))
+                                 (grmr/ignore (grmr/none-or-more not-eol))
+                                 (grmr/ignore newline)))))
 
 (def read-apply-to
   (grmr/rule "apply-to"
