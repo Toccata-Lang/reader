@@ -11,11 +11,11 @@
 ;; The different types of nodes in the AST
 (add-ns ast (git-dependency "https://github.com/Toccata-Lang/ast.git"
                             "ast.toc"
-                            :sha "241b256"))
+                            :sha "1b90da5"))
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
-                          :sha "0f848e9"))
+                          :sha "98a3708"))
 
 (defn min [x y]
   (either (< x y)
@@ -674,8 +674,7 @@
              (apply-to (fn [file line [seq-constraint] items-types tail-type]
                          (-> seq-constraint
                              (c/set-items (vec items-types))
-                             (c/set-tail (either tail-type
-                                                 c/no-tail))
+                             (c/set-tail tail-type)
                              (c/update-path file line)))
                        read-open-paren
                        ignore-whitespace
@@ -691,7 +690,7 @@
                                  (grmr/ignore "[")
                                  (grmr/none-or-more read-sub-type)
                                  read-close-bracket)
-                       (grmr/optional read-sub-type)
+                       (grmr/optional read-sub-type c/no-tail)
                        read-close-paren)))
 
 (def seq-assertions
@@ -847,8 +846,7 @@
                        (grmr/ignore "inline")
                        (grmr/ignore (grmr/one-or-more whitespace))
                        (grmr/any (apply-to (fn [file-name line-number lang return-type body]
-                                             (ast/inline-ast lang (either return-type
-                                                                          c/top-type)
+                                             (ast/inline-ast lang return-type
                                                              body file-name line-number))
                                            (grmr/get-value 'file-name)
                                            (grmr/get-value 'line-number)
@@ -860,7 +858,8 @@
                                            (grmr/optional
                                             (apply-to identity
                                                       read-type-expr
-                                                      (grmr/ignore (grmr/one-or-more whitespace))))
+                                                      (grmr/ignore (grmr/one-or-more whitespace)))
+                                            c/top-type)
                                            (grmr/any read-string
                                                      (grmr/error "The code to be inlined must be a"
                                                                  "string literal."))
@@ -917,7 +916,7 @@
                        (grmr/ignore (grmr/one-or-more whitespace))
                        (grmr/any (apply-to (fn [name arities]
                                              (ast/fn-expr name arities))
-                                           (grmr/optional read-symbol)
+                                           (grmr/optional read-symbol c/no-symbol)
                                            ignore-whitespace
                                            read-arities
                                            read-close-paren)
@@ -974,7 +973,7 @@
 (def read-reify
   (grmr/rule "reify"
              (apply-to (fn [impls]
-                         (ast/reified nothing impls))
+                         (ast/reified c/no-int impls))
                        read-open-paren
                        (grmr/ignore "reify")
                        (grmr/ignore (grmr/one-or-more whitespace))
@@ -1154,7 +1153,7 @@
   (nest-binding [body binding wrapper]
     (ast/call-ast (ast/tag 'flat-map (ast/file-name binding) (ast/line-number binding))
                   [(.val binding)
-                   (ast/fn-expr nothing
+                   (ast/fn-expr c/no-symbol
                                 [(ast/fn-arity (ast/params [(.binding binding)]) ""
                                                [body])])]
                   c/top-type)))
@@ -1164,7 +1163,7 @@
   (nest-binding [body binding wrapper]
     (ast/call-ast (ast/tag 'flat-map (ast/file-name binding) (ast/line-number binding))
                   [(.val binding)
-                   (ast/fn-expr nothing
+                   (ast/fn-expr c/no-symbol
                                 [(ast/fn-arity (ast/params [(.binding binding)]) ""
                                                [body])])]
                   c/top-type)))
@@ -1174,7 +1173,7 @@
   (nest-binding [body binding wrapper]
     (ast/call-ast (ast/tag 'flat-map (ast/file-name binding) (ast/line-number binding))
                   [(.val binding)
-                   (ast/fn-expr nothing
+                   (ast/fn-expr c/no-symbol
                                 [(ast/fn-arity (ast/params [(.binding binding)]) ""
                                                [body])])]
                   c/top-type)))
@@ -1184,7 +1183,7 @@
   (nest-binding [body binding wrapper]
     (ast/call-ast (ast/tag 'flat-map (ast/file-name binding) (ast/line-number binding))
                   [(.val binding)
-                   (ast/fn-expr nothing
+                   (ast/fn-expr c/no-symbol
                                 [(ast/fn-arity (ast/params [(.binding binding)]) ""
                                                [body])])]
                   c/top-type)))
@@ -1272,7 +1271,7 @@
                        (ast/call-ast (ast/tag 'zero fn ln)
                                      [wrapper]
                                      c/top-type))
-        (ast/fn-expr nothing
+        (ast/fn-expr c/no-symbol
                      [(ast/fn-arity (ast/params [(ast/tag "#x" fn ln)]) ""
                                     [(ast/call-ast (ast/tag 'wrap fn ln)
                                                    [wrapper (ast/tag "#x" fn ln)]
@@ -1286,7 +1285,7 @@
        (ast/tag 'flat-map fn ln)
        [(ast/cond-expr [(ast/cond-val-expr clause (ast/call-ast (ast/tag 'zero fn ln) [wrapper] c/top-type))]
                       (ast/call-ast (ast/tag 'wrap fn ln) [wrapper body] c/top-type))
-        (ast/fn-expr nothing
+        (ast/fn-expr c/no-symbol
                      [(ast/fn-arity (ast/params [(ast/tag "#x" fn ln)]) ""
                                     [(ast/call-ast (ast/tag 'wrap fn ln)
                                                    [wrapper (ast/tag "#x" fn ln)]
@@ -1298,7 +1297,7 @@
           ln (ast/line-number binding)]
       (ast/call-ast (ast/tag 'map fn ln)
                     [(.val binding)
-                     (ast/fn-expr nothing
+                     (ast/fn-expr c/no-symbol
                                   [(ast/fn-arity (ast/params [(.binding binding)]) ""
                                                  [body])])]
                     c/top-type)))
@@ -1516,8 +1515,7 @@
                        (grmr/ignore (grmr/one-or-more whitespace))
                        (grmr/any (apply-to (fn [name arities]
                                              (ast/definition name
-                                               (list (ast/fn-expr (maybe name)
-                                                                  arities))))
+                                               (list (ast/fn-expr name arities))))
                                            (grmr/any read-symbol
                                                      (grmr/error "'defn' must be followed by"
                                                                  "the name of the function."))
@@ -1833,11 +1831,11 @@
                        (grmr/get-value 'line-number)
                        ignore-whitespace
                        (grmr/any (apply-to (fn [proto-sym type-sym]
-                                             (ast/GetImpl proto-sym (either type-sym c/no-symbol) c/top-type))
+                                             (ast/GetImpl proto-sym type-sym c/top-type))
                                            (grmr/ignore "(#impl")
                                            ignore-whitespace
                                            read-symbol
-                                           (grmr/optional read-symbol)
+                                           (grmr/optional read-symbol c/no-symbol)
                                            read-close-paren)
                                  read-expr)
                        read-expected-type
