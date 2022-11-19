@@ -11,11 +11,11 @@
 ;; The different types of nodes in the AST
 (add-ns ast (git-dependency "https://github.com/Toccata-Lang/ast.git"
                             "ast.toc"
-                            :sha "1b90da5"))
+                            :sha "96bdbd7"))
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
-                          :sha "98a3708"))
+                          :sha "a48f546"))
 
 (defn min [x y]
   (either (< x y)
@@ -525,7 +525,7 @@
   (grmr/rule "required-arities"
              (apply-to (fn [file line arg-counts]
                          ;; ! (vector-of Integer) arg-counts
-                         (-> (c/FnConstraint (vec arg-counts) {} empty-list c/no-symbol "")
+                         (-> (c/FnConstraint arg-counts {} empty-list c/no-symbol "")
                              (c/update-path file line)))
                        read-open-paren
                        ignore-whitespace
@@ -673,7 +673,7 @@
   (grmr/rule "seq-as"
              (apply-to (fn [file line [seq-constraint] items-types tail-type]
                          (-> seq-constraint
-                             (c/set-items (vec items-types))
+                             (c/set-items items-types)
                              (c/set-tail tail-type)
                              (c/update-path file line)))
                        read-open-paren
@@ -694,20 +694,19 @@
                        read-close-paren)))
 
 (def seq-assertions
-  {"vector-from" c/VectFrom
-   "list-from" c/ListFrom
-   "rest-of" c/RestOf
-   "butlast-of" c/ButLastOf
-   "first-of" c/FirstOf
-   "last-of" c/LastOf})
+  {"vector-from" c/vect-from
+   "list-from" c/list-from
+   "rest-of" c/rest-of
+   "butlast-of" c/butlast-of
+   "first-of" c/first-of
+   "last-of" c/last-of})
 
 (def read-seq-type
   (grmr/rule "seq-type"
              (apply-to (fn [base-string file line c]
                          (either (map (get seq-assertions base-string)
-                                      (fn [f]
-                                        (-> (c/ComputedConstraint [c (f empty-list c/no-symbol "")]
-                                                                  empty-list c/no-symbol "")
+                                      (fn [op-c]
+                                        (-> (c/ComputedConstraint [c op-c] empty-list c/no-symbol "")
                                             (c/update-path file line))))
                                  (do
                                    (print-err "No modified sequence type" (str "'" base-string "'")
@@ -920,8 +919,8 @@
   (grmr/rule "arities"
              (grmr/any (apply-to vector read-single-arity)
                        (apply-to (fn [doc arities]
-                                   (vec (map arities (fn [arity]
-                                                       (.doc arity doc)))))
+                                   (map arities (fn [arity]
+                                                  (.doc arity doc))))
                                  read-fn-doc
                                  (grmr/one-or-more (apply-to identity
                                                              read-open-paren
@@ -1505,9 +1504,7 @@
                        (grmr/any (apply-to
                                   (fn [sym prototypes]
                                     (ast/protocol
-                                     sym (-> prototypes
-                                             (remove (partial instance? ast/NoCode))
-                                             vec)))
+                                     sym (remove prototypes (partial instance? ast/NoCode))))
                                   (grmr/any read-symbol
                                             (grmr/error "'defprotocol' must be followed by"
                                                         "the name of the protocol."))
@@ -1726,14 +1723,14 @@
                     "c/string-constraint" c/string-constraint
                     "c/substr-constraint" c/substr-constraint
                     "c/empty-fn-constraint" c/empty-fn-constraint
-                    ;; "c/list-from" c/list-from
-                    ;; "c/vect-from" c/vect-from
+                    "c/list-from-op" c/list-from-op
+                    "c/vect-from-op" c/vect-from-op
                     "c/arg-of-op" c/arg-of-op
                     "c/call-value-op" c/call-value-op
-                    ;; "c/first-of" c/first-of
-                    ;; "c/last-of" c/last-of
-                    ;; "c/rest-of" c/rest-of
-                    ;; "c/butlast-of" c/butlast-of
+                    "c/first-of-op" c/first-of-op
+                    "c/last-of-op" c/last-of-op
+                    "c/rest-of-op" c/rest-of-op
+                    "c/butlast-of-op" c/butlast-of-op
                     ;; "c/get-from-op" c/get-from-op
                     ;; "c/set-to-op" c/set-to-op
                     })
