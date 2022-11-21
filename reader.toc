@@ -11,11 +11,11 @@
 ;; The different types of nodes in the AST
 (add-ns ast (git-dependency "https://github.com/Toccata-Lang/ast.git"
                             "ast.toc"
-                            :sha "96bdbd7"))
+                            :sha "05a321f"))
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
-                          :sha "a48f546"))
+                          :sha "8a9c29a"))
 
 (defn min [x y]
   (either (< x y)
@@ -525,7 +525,7 @@
   (grmr/rule "required-arities"
              (apply-to (fn [file line arg-counts]
                          ;; ! (vector-of Integer) arg-counts
-                         (-> (c/FnConstraint arg-counts {} empty-list c/no-symbol "")
+                         (-> (.required-arities c/fn-constraint arg-counts)
                              (c/update-path file line)))
                        read-open-paren
                        ignore-whitespace
@@ -652,10 +652,19 @@
                        read-sub-type
                        read-close-paren)))
 
+(def read-seq-items
+  (grmr/rule "seq-items"
+             (apply-to identity
+                       ignore-whitespace
+                       (grmr/ignore "[")
+                       (grmr/one-or-more read-sub-type)
+                       read-close-bracket)))
+
 (def read-seq-of
   (grmr/rule "seq-of"
-             (apply-to (fn [file line [seq-constraint] tail-type]
+             (apply-to (fn [file line [seq-constraint] item-types tail-type]
                          (-> seq-constraint
+                             (c/set-items item-types)
                              (c/set-tail (c/CollectionOf tail-type empty-list c/no-symbol ""))
                              (c/update-path file line)))
                        read-open-paren
@@ -666,7 +675,8 @@
                                            (grmr/always c/list-constraint))
                                  (grmr/all (grmr/ignore "vector-of")
                                            (grmr/always c/vect-constraint)))
-                       read-sub-type
+                       (grmr/optional read-seq-items [])
+                       (grmr/optional read-sub-type c/no-tail)
                        read-close-paren)))
 
 (def read-seq-as
@@ -1719,6 +1729,7 @@
                     "c/int-constraint" c/int-constraint
                     "c/maybe-constraint" c/maybe-constraint
                     "c/inner-type-of" c/inner-type-of
+                    "c/inner-type-of-op" c/inner-type-of-op
                     "c/result-of" c/result-of
                     "c/string-constraint" c/string-constraint
                     "c/substr-constraint" c/substr-constraint
@@ -1772,6 +1783,7 @@
                        "c/fn-arity" c/fn-arity
                        "c/intersect" c/intersect
                        "c/reify-type-constraint" c/reify-type-constraint
+                       ".required-arities" .required-arities
                        "symbol" symbol
                        "=" =
                        })
@@ -1852,6 +1864,7 @@
                                            (grmr/ignore "(#impl")
                                            ignore-whitespace
                                            read-symbol
+                                           ignore-whitespace
                                            (grmr/optional read-symbol c/no-symbol)
                                            read-close-paren)
                                  read-expr)
