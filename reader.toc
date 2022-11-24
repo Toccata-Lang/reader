@@ -11,11 +11,11 @@
 ;; The different types of nodes in the AST
 (add-ns ast (git-dependency "https://github.com/Toccata-Lang/ast.git"
                             "ast.toc"
-                            :sha "1186efb"))
+                            :sha "afe02c1"))
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
-                          :sha "522bfe3"))
+                          :sha "2f6e544"))
 
 (defn min [x y]
   (either (< x y)
@@ -665,7 +665,7 @@
              (apply-to (fn [file line [seq-constraint] item-types tail-type]
                          (-> seq-constraint
                              (c/set-items item-types)
-                             (c/set-tail (c/CollectionOf tail-type empty-list c/no-symbol ""))
+                             (c/set-tail tail-type)
                              (c/update-path file line)))
                        read-open-paren
                        ignore-whitespace
@@ -676,7 +676,10 @@
                                  (grmr/all (grmr/ignore "vector-of")
                                            (grmr/always c/vect-constraint)))
                        (grmr/optional read-seq-items [])
-                       (grmr/optional read-sub-type c/no-tail)
+                       (grmr/optional (apply-to (fn [c]
+                                                  (c/CollectionOf c empty-list c/no-symbol ""))
+                                                read-sub-type)
+                                      c/no-tail)
                        read-close-paren)))
 
 (def read-seq-as
@@ -1716,6 +1719,7 @@
                     "c/empty-vect-constraint" c/empty-vect-constraint
                     "c/list-constraint" c/list-constraint
                     "c/vect-constraint" c/vect-constraint
+                    "c/seq-constraint" c/seq-constraint
                     "c/no-symbol" c/no-symbol
                     "c/no-tail" c/no-tail
                     "c/no-int" c/no-int
@@ -1732,6 +1736,7 @@
                     "c/inner-type-of-op" c/inner-type-of-op
                     "c/result-of" c/result-of
                     "c/string-constraint" c/string-constraint
+                    "c/strbuff-constraint" c/strbuff-constraint
                     "c/substr-constraint" c/substr-constraint
                     "c/empty-fn-constraint" c/empty-fn-constraint
                     "c/list-from-op" c/list-from-op
