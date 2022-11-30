@@ -11,11 +11,11 @@
 ;; The different types of nodes in the AST
 (add-ns ast (git-dependency "https://github.com/Toccata-Lang/ast.git"
                             "ast.toc"
-                            :sha "70ace16"))
+                            :sha "93abb3f"))
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
-                          :sha "103f2be"))
+                          :sha "6b2f470"))
 
 (defn min [x y]
   (either (< x y)
@@ -1742,6 +1742,7 @@
                     "c/fn-constraint" c/fn-constraint
                     "c/int-constraint" c/int-constraint
                     "c/maybe-constraint" c/maybe-constraint
+                    "c/future-constraint" c/future-constraint
                     "c/inner-type-of" c/inner-type-of
                     "c/inner-type-of-op" c/inner-type-of-op
                     "c/result-of" c/result-of
@@ -1775,8 +1776,12 @@
 (def type-constraints {"c/AllValues" c/AllValues
                        "c/NoValues" c/NoValues
                        "c/FnConstraint" c/FnConstraint
+                       "c/fn-c " c/fn-c
                        "c/fn-arity" c/fn-arity
                        "c/ListConstraint" c/ListConstraint
+                       "c/list-c " c/list-c
+                       "c/param " c/param
+                       "c/params-list" c/params-list
                        "c/ParamConstraint" c/ParamConstraint
                        "c/MaybeConstraint" c/MaybeConstraint
                        "c/IntegerConstraint" c/IntegerConstraint
@@ -1786,15 +1791,20 @@
                        "c/SubStrConstraint" c/SubStrConstraint
                        "c/HashMapConstraint" c/HashMapConstraint
                        "c/VectorConstraint" c/VectorConstraint
+                       "c/vect-c " c/vect-c
                        "c/AgentConstraint" c/AgentConstraint
                        "c/FutureConstraint" c/FutureConstraint
                        "c/OpaqueConstraint" c/OpaqueConstraint
                        "c/PromiseConstraint" c/PromiseConstraint
                        "c/ReifiedConstraint" c/ReifiedConstraint
                        "c/SumConstraint" c/SumConstraint
+                       "c/sum-c" c/sum-c
                        "c/ComputedConstraint" c/ComputedConstraint
+                       "c/compute-c" c/compute-c
                        "c/CollectionOf" c/CollectionOf
+                       "c/coll-of-c" c/coll-of-c
                        "c/TypeOp" c/TypeOp
+                       "c/type-op" c/type-op
                        "c/fn-arity" c/fn-arity
                        "c/intersect" c/intersect
                        "c/reify-type-constraint" c/reify-type-constraint
