@@ -11,11 +11,11 @@
 ;; The different types of nodes in the AST
 (add-ns ast (git-dependency "https://github.com/Toccata-Lang/ast.git"
                             "ast.toc"
-                            :sha "93abb3f"))
+                            :sha "b6320af"))
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
-                          :sha "6b2f470"))
+                          :sha "df4c94c"))
 
 (defn min [x y]
   (either (< x y)
@@ -1408,8 +1408,9 @@
 (def read-thread-expr
   (grmr/rule "->exp"
              (grmr/any (apply-to identity
-                                 (grmr/any (apply-to ast/call-expr
-                                                     (grmr/all read-symbol))
+                                 (grmr/any (apply-to (fn [sym]
+                                                       (ast/call-expr [sym]))
+                                                     read-symbol)
                                            read-call)
                                  ignore-whitespace)
                        read-block-comment)))
@@ -1781,7 +1782,6 @@
                        "c/ListConstraint" c/ListConstraint
                        "c/list-c " c/list-c
                        "c/param " c/param
-                       "c/params-list" c/params-list
                        "c/ParamConstraint" c/ParamConstraint
                        "c/MaybeConstraint" c/MaybeConstraint
                        "c/IntegerConstraint" c/IntegerConstraint
