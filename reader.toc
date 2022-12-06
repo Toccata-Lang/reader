@@ -11,11 +11,11 @@
 ;; The different types of nodes in the AST
 (add-ns ast (git-dependency "https://github.com/Toccata-Lang/ast.git"
                             "ast.toc"
-                            :sha "f971f3d"))
+                            :sha "50cf27f"))
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
-                          :sha "b06a5aa"))
+                          :sha "0206d6e"))
 
 (defn min [x y]
   (either (< x y)
@@ -453,12 +453,10 @@
 (def read-type-of-result-type
   (grmr/rule "type-of-result"
              (apply-to (fn [file line c arg-cs]
-                         (let [arg-cs (comp* [] (seq arg-cs))
-                               op-c (c/TypeOp c/call-value-op (cond (empty? arg-cs)
-                                                                    c/no-args
-                                                                    arg-cs)
-                                              empty-list)]
-                           (-> (c/ComputedConstraint [c op-c] empty-list c/no-symbol "")
+                         (let [arg-cs (comp* [] (seq arg-cs))]
+                           (-> (c/type-op c/call-value-op c (cond (empty? arg-cs)
+                                                                  c/no-args
+                                                                  arg-cs))
                                (c/update-path file line))))
                        read-open-paren
                        (grmr/ignore "type-of-result")
@@ -482,7 +480,7 @@
 (def read-inner-type-of-type
   (grmr/rule "inner-type-of"
              (apply-to (fn [file line c]
-                         (-> (c/ComputedConstraint [c c/inner-type-of] empty-list c/no-symbol "")
+                         (-> (.base c/inner-type-of c)
                              (c/update-path file line)))
                        read-open-paren
                        ignore-whitespace
@@ -515,8 +513,7 @@
 (def read-type-of-arg-type
   (grmr/rule "type-of-arg"
              (apply-to (fn [file line c arg-pos]
-                         (-> (c/ComputedConstraint [c (c/TypeOp c/arg-of-op (.int arg-pos) empty-list)]
-                                                   empty-list c/no-symbol "")
+                         (-> (c/type-op c/arg-of-op c (.int arg-pos))
                              (c/update-path file line)))
                        read-open-paren
                        ignore-whitespace
@@ -576,22 +573,7 @@
 
 (def read-multi-type
   (grmr/rule "multi-type"
-             (apply-to (fn [type-exprs]
-                         (c/ComputedConstraint type-exprs empty-list c/no-symbol "")
-                         ;; (c/trim (reduce type-exprs c/top-type
-                         ;;                 (fn [ex1 ex2]
-                         ;;                   (let [r1 (c/intersect ex1 ex2)
-                         ;;                         r2 (c/intersect ex2 ex1)]
-                         ;;                     (or (= r1 r2)
-                         ;;                         (do
-                         ;;                           (print-err 'boom _LINE_
-                         ;;                                      "\n" 'ex1 ex1
-                         ;;                                      "\n\n" 'ex2 ex2
-                         ;;                                      "\n\n" 'r1 r1
-                         ;;                                      "\n\n" 'r2 r2)
-                         ;;                           nothing))
-                         ;;                     r1))))
-                         )
+             (apply-to c/multi
                        read-open-paren
                        ignore-whitespace
                        (grmr/ignore "all-of")
@@ -729,7 +711,7 @@
              (apply-to (fn [base-string file line c]
                          (either (map (get seq-assertions base-string)
                                       (fn [op-c]
-                                        (-> (c/ComputedConstraint [c op-c] empty-list c/no-symbol "")
+                                        (-> (.base op-c c)
                                             (c/update-path file line))))
                                  (do
                                    (print-err "No modified sequence type" (str "'" base-string "'")
@@ -1799,7 +1781,7 @@
                        "c/ReifiedConstraint" c/ReifiedConstraint
                        "c/SumConstraint" c/SumConstraint
                        "c/sum-c" c/sum-c
-                       "c/ComputedConstraint" c/ComputedConstraint
+                       "c/multi" c/multi
                        "c/compute-c" c/compute-c
                        "c/CollectionOf" c/CollectionOf
                        "c/coll-of-c" c/coll-of-c
