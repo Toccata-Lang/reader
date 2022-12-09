@@ -11,11 +11,11 @@
 ;; The different types of nodes in the AST
 (add-ns ast (git-dependency "https://github.com/Toccata-Lang/ast.git"
                             "ast.toc"
-                            :sha "50cf27f"))
+                            :sha "b9c70b2"))
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
-                          :sha "0206d6e"))
+                          :sha "01fa25e"))
 
 (defn min [x y]
   (either (< x y)
@@ -1782,7 +1782,6 @@
                        "c/SumConstraint" c/SumConstraint
                        "c/sum-c" c/sum-c
                        "c/multi" c/multi
-                       "c/compute-c" c/compute-c
                        "c/CollectionOf" c/CollectionOf
                        "c/coll-of-c" c/coll-of-c
                        "c/TypeOp" c/TypeOp
@@ -1792,8 +1791,6 @@
                        "c/reify-type-constraint" c/reify-type-constraint
                        ".required-arities" .required-arities
                        "c/Location" c/Location
-                       "c/merge-mods" c/merge-mods
-                       "c/derive" c/derive
                        "symbol" symbol
                        "=" =
                        })
