@@ -11,11 +11,11 @@
 ;; The different types of nodes in the AST
 (add-ns ast (git-dependency "https://github.com/Toccata-Lang/ast.git"
                             "ast.toc"
-                            :sha "2172f04"))
+                            :sha "98e9c2e"))
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
-                          :sha "c252850"))
+                          :sha "bf9b8c3"))
 
 (defn min [x y]
   (either (< x y)
@@ -491,7 +491,7 @@
                        (grmr/any (apply-to (fn [sym]
                                              (c/TypeOfConstraint sym empty-list c/no-symbol ""))
                                            read-symbol)
-                                 read-type-of-result-type
+                                 read-sub-type
                                  (grmr/error "Invalid 'inner-type-of' expression"))
                        read-close-paren)))
 
