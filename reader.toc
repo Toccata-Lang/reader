@@ -11,11 +11,11 @@
 ;; The different types of nodes in the AST
 (add-ns ast (git-dependency "https://github.com/Toccata-Lang/ast.git"
                             "ast.toc"
-                            :sha "7f33668"))
+                            :sha "3f717a6"))
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
-                          :sha "3eb629e"))
+                          :sha "dfa3533"))
 
 (defn min [x y]
   (either (< x y)
@@ -450,16 +450,46 @@
 (def read-sub-type
   (grmr/recurse "type-expr"))
 
+(def read-concat-type
+  (grmr/rule "concat"
+             (apply-to (fn [file line c]
+                         (-> (c/type-op c/concat-op c c/no-args)
+                             (c/update-path file line)))
+                       read-open-paren
+                       (grmr/ignore "concat")
+                       (grmr/get-value 'file-name)
+                       (grmr/get-value 'line-number)
+                       ignore-whitespace
+                       (apply-to (fn [sym]
+                                   (c/TypeOfConstraint sym empty-list c/no-symbol ""))
+                                 read-symbol)
+                       read-close-paren)))
+
 (def read-type-of-result-type
-  (grmr/rule "type-of-result"
+  (grmr/rule "result-of"
+             (apply-to (fn [file line c]
+                         (-> (c/type-op c/call-value-op c c/no-args)
+                             (c/update-path file line)))
+                       read-open-paren
+                       (grmr/ignore "result-of")
+                       (grmr/get-value 'file-name)
+                       (grmr/get-value 'line-number)
+                       ignore-whitespace
+                       (grmr/any (apply-to (fn [sym]
+                                             (c/TypeOfConstraint sym empty-list c/no-symbol ""))
+                                           read-symbol)
+                                 read-sub-type
+                                 (grmr/error "Invalid type expression"))
+                       read-close-paren)))
+
+(def read-type-of-fn-call
+  (grmr/rule "call-fn"
              (apply-to (fn [file line c arg-cs]
                          (let [arg-cs (comp* [] (seq arg-cs))]
-                           (-> (c/type-op c/call-value-op c (cond (empty? arg-cs)
-                                                                  c/no-args
-                                                                  arg-cs))
+                           (-> (c/type-op c/call-value-op c arg-cs)
                                (c/update-path file line))))
                        read-open-paren
-                       (grmr/ignore "type-of-result")
+                       (grmr/ignore "call-fn")
                        (grmr/get-value 'file-name)
                        (grmr/get-value 'line-number)
                        ignore-whitespace
@@ -469,12 +499,14 @@
                                            read-symbol)
                                  read-sub-type
                                  (grmr/error "Invalid type expression"))
-                       (grmr/none-or-more (grmr/all ignore-whitespace
-                                                    (grmr/any (apply-to (fn [sym]
-                                                                          (c/TypeOfConstraint sym empty-list
-                                                                                              c/no-symbol ""))
-                                                                        read-symbol)
-                                                              read-sub-type)))
+                       (grmr/any (grmr/one-or-more
+                                  (grmr/all ignore-whitespace
+                                            (grmr/any (apply-to (fn [sym]
+                                                                  (c/TypeOfConstraint sym empty-list
+                                                                                      c/no-symbol ""))
+                                                                read-symbol)
+                                                      read-sub-type)))
+                                 (grmr/error "At least one argument is needed"))
                        read-close-paren)))
 
 (def read-inner-type-of-type
@@ -760,7 +792,9 @@
                        read-seq-as
                        read-generic-type
                        read-type-of-arg-type
+                       read-concat-type
                        read-type-of-result-type
+                       read-type-of-fn-call
                        read-required-arities
                        read-type-of-type
                        read-min-count-assertion
@@ -1660,19 +1694,6 @@
                                            read-close-paren)
                                  (grmr/error "Invalid 'module' expression")))))
 
-;; (defn output-error [error curr-state]
-;;   (either (or (for [file (get-in error [.state .values 'file-name])
-;;                     line (get-in error [.state .values 'line-number])
-;;                     expr-line (get-in curr-state [.values 'line-number])]
-;;                 (do
-;;                   (.val error (str (.val error) " At " file ": " line "."
-;;                                    (cond (= line expr-line) ""
-;;                                          (str "\n In expression at line " (str expr-line ".")))))))
-;;               (for [file (get-in error [.state .values 'file-name])
-;;                     expr-line (get-in curr-state [.values 'line-number])]
-;;                 (.val error (str (.val error) " At " file ": " expr-line "."))))
-;;           error))
-
 (def read-add-ns
   (grmr/rule
    "add-ns"
@@ -1742,6 +1763,7 @@
                     "c/vect-from-op" c/vect-from-op
                     "c/arg-of-op" c/arg-of-op
                     "c/call-value-op" c/call-value-op
+                    "c/concat-op" c/concat-op
                     "c/first-of-op" c/first-of-op
                     "c/last-of-op" c/last-of-op
                     "c/rest-of-op" c/rest-of-op
