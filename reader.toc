@@ -11,11 +11,11 @@
 ;; The different types of nodes in the AST
 (add-ns ast (git-dependency "https://github.com/Toccata-Lang/ast.git"
                             "ast.toc"
-                            :sha "3f717a6"))
+                            :sha "2f738df"))
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
-                          :sha "dfa3533"))
+                          :sha "2ce5f25"))
 
 (defn min [x y]
   (either (< x y)
@@ -450,21 +450,6 @@
 (def read-sub-type
   (grmr/recurse "type-expr"))
 
-(def read-concat-type
-  (grmr/rule "concat"
-             (apply-to (fn [file line c]
-                         (-> (c/type-op c/concat-op c c/no-args)
-                             (c/update-path file line)))
-                       read-open-paren
-                       (grmr/ignore "concat")
-                       (grmr/get-value 'file-name)
-                       (grmr/get-value 'line-number)
-                       ignore-whitespace
-                       (apply-to (fn [sym]
-                                   (c/TypeOfConstraint sym empty-list c/no-symbol ""))
-                                 read-symbol)
-                       read-close-paren)))
-
 (def read-type-of-result-type
   (grmr/rule "result-of"
              (apply-to (fn [file line c]
@@ -706,6 +691,44 @@
                                       c/no-tail)
                        read-close-paren)))
 
+(def read-type-of-fn-apply
+  (grmr/rule "apply-fn"
+             (apply-to (fn [file line c arg-cs]
+                         (-> (c/type-op c/apply-op c arg-cs)
+                             (c/update-path file line)))
+                       read-open-paren
+                       (grmr/ignore "apply-fn")
+                       (grmr/get-value 'file-name)
+                       (grmr/get-value 'line-number)
+                       ignore-whitespace
+                       (apply-to (fn [sym]
+                                   (c/TypeOfConstraint sym empty-list
+                                                       c/no-symbol ""))
+                                 read-symbol)
+                       ignore-whitespace
+                       (apply-to (fn [sym]
+                                   (c/TypeOfConstraint sym empty-list
+                                                       c/no-symbol ""))
+                                 read-symbol)
+                       read-close-paren)))
+
+(def read-concat-type
+  (grmr/rule "concat"
+             (apply-to (fn [file line c]
+                         (-> (c/type-op c/concat-op c c/no-args)
+                             (c/update-path file line)))
+                       read-open-paren
+                       (grmr/ignore "concat")
+                       (grmr/get-value 'file-name)
+                       (grmr/get-value 'line-number)
+                       ignore-whitespace
+                       (grmr/any (apply-to (fn [sym]
+                                             (c/TypeOfConstraint sym empty-list c/no-symbol ""))
+                                           read-symbol)
+                                 read-seq-of
+                                 (grmr/error "Invalid type expression"))
+                       read-close-paren)))
+
 (def read-seq-as
   (grmr/rule "seq-as"
              (apply-to (fn [file line [seq-constraint] items-types tail-type]
@@ -795,6 +818,7 @@
                        read-concat-type
                        read-type-of-result-type
                        read-type-of-fn-call
+                       read-type-of-fn-apply
                        read-required-arities
                        read-type-of-type
                        read-min-count-assertion
@@ -1749,6 +1773,7 @@
                     "c/top-type" c/top-type
                     "c/bottom-type" c/bottom-type
                     "c/fn-constraint" c/fn-constraint
+                    "c/arity-constraint" c/arity-constraint
                     "c/int-constraint" c/int-constraint
                     "c/maybe-constraint" c/maybe-constraint
                     "c/future-constraint" c/future-constraint
@@ -1764,6 +1789,7 @@
                     "c/arg-of-op" c/arg-of-op
                     "c/call-value-op" c/call-value-op
                     "c/concat-op" c/concat-op
+                    "c/apply-op" c/apply-op
                     "c/first-of-op" c/first-of-op
                     "c/last-of-op" c/last-of-op
                     "c/rest-of-op" c/rest-of-op
