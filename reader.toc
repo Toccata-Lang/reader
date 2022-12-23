@@ -11,11 +11,11 @@
 ;; The different types of nodes in the AST
 (add-ns ast (git-dependency "https://github.com/Toccata-Lang/ast.git"
                             "ast.toc"
-                            :sha "cdd9d4f"))
+                            :sha "18bf6ee"))
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
-                          :sha "39e4385"))
+                          :sha "1e82de1"))
 
 (defn min [x y]
   (either (< x y)
@@ -661,6 +661,27 @@
                        read-sub-type
                        read-close-paren)))
 
+(def read-type-of-fn-apply
+  (grmr/rule "apply-fn"
+             (apply-to (fn [file line c arg-cs]
+                         (-> (c/type-op c/apply-op c arg-cs)
+                             (c/update-path file line)))
+                       read-open-paren
+                       (grmr/ignore "apply-fn")
+                       (grmr/get-value 'file-name)
+                       (grmr/get-value 'line-number)
+                       ignore-whitespace
+                       (apply-to (fn [sym]
+                                   (c/TypeOfConstraint sym empty-list
+                                                       c/no-symbol ""))
+                                 read-symbol)
+                       ignore-whitespace
+                       (apply-to (fn [sym]
+                                   (c/TypeOfConstraint sym empty-list
+                                                       c/no-symbol ""))
+                                 read-symbol)
+                       read-close-paren)))
+
 (def read-seq-items
   (grmr/rule "seq-items"
              (apply-to identity
@@ -669,6 +690,7 @@
                        (grmr/one-or-more read-sub-type)
                        read-close-bracket)))
 
+;; seq-of specifies the kinds of items in the seq
 (def read-seq-of
   (grmr/rule "seq-of"
              (apply-to (fn [file line [seq-constraint] item-types tail-type]
@@ -691,44 +713,7 @@
                                       c/no-tail)
                        read-close-paren)))
 
-(def read-type-of-fn-apply
-  (grmr/rule "apply-fn"
-             (apply-to (fn [file line c arg-cs]
-                         (-> (c/type-op c/apply-op c arg-cs)
-                             (c/update-path file line)))
-                       read-open-paren
-                       (grmr/ignore "apply-fn")
-                       (grmr/get-value 'file-name)
-                       (grmr/get-value 'line-number)
-                       ignore-whitespace
-                       (apply-to (fn [sym]
-                                   (c/TypeOfConstraint sym empty-list
-                                                       c/no-symbol ""))
-                                 read-symbol)
-                       ignore-whitespace
-                       (apply-to (fn [sym]
-                                   (c/TypeOfConstraint sym empty-list
-                                                       c/no-symbol ""))
-                                 read-symbol)
-                       read-close-paren)))
-
-(def read-concat-type
-  (grmr/rule "concat"
-             (apply-to (fn [file line c]
-                         (-> (c/type-op c/concat-op c c/no-args)
-                             (c/update-path file line)))
-                       read-open-paren
-                       (grmr/ignore "concat")
-                       (grmr/get-value 'file-name)
-                       (grmr/get-value 'line-number)
-                       ignore-whitespace
-                       (grmr/any (apply-to (fn [sym]
-                                             (c/TypeOfConstraint sym empty-list c/no-symbol ""))
-                                           read-symbol)
-                                 read-seq-of
-                                 (grmr/error "Invalid type expression"))
-                       read-close-paren)))
-
+;; seq-as specifies the specific items and the exact tail constraint
 (def read-seq-as
   (grmr/rule "seq-as"
              (apply-to (fn [file line [seq-constraint] items-types tail-type]
@@ -751,6 +736,23 @@
                                  (grmr/none-or-more read-sub-type)
                                  read-close-bracket)
                        (grmr/optional read-sub-type c/no-tail)
+                       read-close-paren)))
+
+(def read-concat-type
+  (grmr/rule "concat"
+             (apply-to (fn [file line c]
+                         (-> (c/type-op c/concat-op c c/no-args)
+                             (c/update-path file line)))
+                       read-open-paren
+                       (grmr/ignore "concat")
+                       (grmr/get-value 'file-name)
+                       (grmr/get-value 'line-number)
+                       ignore-whitespace
+                       (grmr/any (apply-to (fn [sym]
+                                             (c/TypeOfConstraint sym empty-list c/no-symbol ""))
+                                           read-symbol)
+                                 read-seq-as
+                                 (grmr/error "Invalid type expression"))
                        read-close-paren)))
 
 (def seq-assertions
