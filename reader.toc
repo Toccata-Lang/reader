@@ -752,6 +752,7 @@
                                              (c/TypeOfConstraint sym empty-list c/no-symbol ""))
                                            read-symbol)
                                  read-seq-as
+                                 read-seq-of
                                  (grmr/error "Invalid type expression"))
                        read-close-paren)))
 
