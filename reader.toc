@@ -11,11 +11,11 @@
 ;; The different types of nodes in the AST
 (add-ns ast (git-dependency "https://github.com/Toccata-Lang/ast.git"
                             "ast.toc"
-                            :sha "20e37d4"))
+                            :sha "b234411"))
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
-                          :sha "88cc34c"))
+                          :sha "16aec3c"))
 
 (defn min [x y]
   (either (< x y)
@@ -564,14 +564,14 @@
   (assert (instance? c/ValueConstraint key-type))
   (assert (instance? c/ValueConstraint val-type))
 
-  (-> (cata (fn [c]
-              (cond (instance? c/HashMapConstraint c)
-                    (-> c
-                        (.keys-c key-type)
-                        (.vals-c val-type))
+  (-> ;; (cata (fn [c]
+      ;;         (cond (instance? c/HashMapConstraint c)
+      ;;               (-> c
+      ;;                   (.keys-c key-type)
+      ;;                   (.vals-c val-type))
 
-                    c))
-            c/hashmap-constraint)
+      ;;               c)))
+      c/hashmap-constraint
       (c/update-path (ast/file-name key-type) (ast/line-number key-type))))
 
 (def read-map-assertion
