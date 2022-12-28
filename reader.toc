@@ -11,11 +11,11 @@
 ;; The different types of nodes in the AST
 (add-ns ast (git-dependency "https://github.com/Toccata-Lang/ast.git"
                             "ast.toc"
-                            :sha "a7b35f6"))
+                            :sha "a1f50ec"))
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
-                          :sha "085c6ee"))
+                          :sha "48aed01"))
 
 (defn min [x y]
   (either (< x y)
@@ -631,9 +631,10 @@
    "agent-of" (fn [contents]
                 (c/intersect c/agent-constraint
                              (c/CollectionOf contents empty-list c/no-symbol "")))
-   "promise-of" (fn [contents]
-                  (c/intersect c/promise-constraint
-                               (c/CollectionOf contents empty-list c/no-symbol "")))
+   ;; almost certainly can't use this
+   ;; "promise-of" (fn [contents]
+   ;;                (c/intersect c/promise-constraint
+   ;;                             (c/CollectionOf contents empty-list c/no-symbol "")))
    "sequence-of" (fn [contents]
                    (c/set-tail c/seq-constraint
                                (c/CollectionOf contents empty-list c/no-symbol "")))
