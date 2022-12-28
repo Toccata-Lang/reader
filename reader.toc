@@ -11,11 +11,11 @@
 ;; The different types of nodes in the AST
 (add-ns ast (git-dependency "https://github.com/Toccata-Lang/ast.git"
                             "ast.toc"
-                            :sha "4d354a8"))
+                            :sha "a7b35f6"))
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
-                          :sha "970e9b7"))
+                          :sha "085c6ee"))
 
 (defn min [x y]
   (either (< x y)
@@ -1780,6 +1780,10 @@
                     "c/int-constraint" c/int-constraint
                     "c/maybe-constraint" c/maybe-constraint
                     "c/hashmap-constraint" c/hashmap-constraint
+                    "c/bitmap-constraint" c/bitmap-constraint
+                    "c/array-constraint" c/array-constraint
+                    "c/hash-coll-constraint" c/hash-coll-constraint
+                    "c/promise-constraint" c/promise-constraint
                     "c/future-constraint" c/future-constraint
                     "c/inner-type-of" c/inner-type-of
                     "c/inner-type-of-op" c/inner-type-of-op
