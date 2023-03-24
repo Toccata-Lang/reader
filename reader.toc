@@ -11,7 +11,7 @@
 ;; The different types of nodes in the AST
 (add-ns ast (git-dependency "https://github.com/Toccata-Lang/ast.git"
                             "ast.toc"
-                            :sha "a09fe35"))
+                            :sha "79a7f0c"))
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
@@ -48,7 +48,7 @@
 
 (def read-symbol
   (grmr/rule "tagged-symbol"
-             (apply-to (fn [file-name line-number ns start the-rest]
+             (apply-to (fn [file-name line-number start the-rest]
                          (ast/tagged-symbol c/no-symbol
                                             (symbol (to-str (comp [start] the-rest)))
                                             (symbol (to-str (comp [start] the-rest)))
@@ -179,31 +179,32 @@
   (grmr/rule "call"
              (apply-to ast/call-expr
                        read-open-paren
-                       (grmr/one-or-more read-sub-expr)
+                       (grmr/one-or-more (grmr/any read-sub-expr
+                                                   ;; TODO: for lambda calc only
+                                                   read-integer-literal))
                        read-close-paren)))
 
-(def read-sub-dest
-  (grmr/recurse "destructure"))
-
-(def read-list-destructure
-  (grmr/rule "list-destructure"
-             (apply-to ast/params
-                       ;; TODO: should this use 'open-bracker'?
-                       ignore-whitespace
-                       (grmr/ignore "[")
-                       (grmr/none-or-more read-sub-dest)
-                       (grmr/any (apply-to maybe read-var-arg)
-                                 (grmr/always nothing))
-                       read-close-bracket)))
+(def read-fn-doc
+  (grmr/rule "fn-doc"
+             (grmr/any read-block-comment
+                       (apply-to (fn [fn ln]
+                                   (ast/block-comment fn ln [""]))
+                                 (grmr/get-value 'file-name)
+                                 (grmr/get-value 'line-number)))))
 
 (def read-single-arity
   (grmr/rule "single-arity"
              (apply-to (fn [params doc body]
-                         (ast/fn-arity params doc body))
-                       read-list-destructure
+                         (ast/fn-arity (ast/params (flatten params)) doc body))
+                       (grmr/ignore read-open-bracket)
+                       (grmr/none-or-more (grmr/all ignore-whitespace
+                                                    read-symbol))
+                       (grmr/ignore read-close-bracket)
+                       read-fn-doc
                        (grmr/any (grmr/one-or-more read-sub-expr)
                                  (grmr/error "Body of function is wrong."))
                        ignore-whitespace)))
+
 (def read-arities
   (grmr/rule "arities"
              (apply-to vector read-single-arity)))
@@ -282,6 +283,11 @@
                        (grmr/any read-defn
                                  read-def
                                  read-block-comment
+
+                                 ;; TODO: for lambda calc only
+                                 read-call
+                                 read-integer-literal
+
                                  bad-expr
                                  ;; TODO: detect end of input
                                  ))))
