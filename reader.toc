@@ -11,7 +11,7 @@
 ;; The different types of nodes in the AST
 (add-ns ast (git-dependency "https://github.com/Toccata-Lang/ast.git"
                             "ast.toc"
-                            :sha "e74cda5"))
+                            :sha "321aa0b"))
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
@@ -32,11 +32,11 @@
 
 (def symbol-start
   (grmr/rule "symbol-start"
-               (grmr/any grmr/alpha (grmr/one-of "._<>=+-*/"))))
+               (grmr/any grmr/alpha (grmr/one-of "._<>=+-*/$"))))
 
 (def symbol-punct
   (grmr/rule "symbol-punct"
-               (grmr/one-of "._<>=+-*?")))
+               (grmr/one-of "._<>=+-*?$")))
 
 (def symbol-char
   (grmr/rule "symbol-char"
