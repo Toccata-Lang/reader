@@ -11,7 +11,7 @@
 ;; The different types of nodes in the AST
 (add-ns ast (git-dependency "https://github.com/Toccata-Lang/ast.git"
                             "ast.toc"
-                            :sha "321aa0b"))
+                            :sha "694473d"))
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
@@ -191,7 +191,7 @@
                        (grmr/ignore "let")
                        ignore-whitespace
                        (grmr/ignore "[")
-                       (grmr/any (apply-to ast/binding-ast
+                       (grmr/any (apply-to ast/binding-expr
                                            ignore-whitespace
                                            read-symbol
                                            ignore-whitespace
