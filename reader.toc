@@ -11,11 +11,11 @@
 ;; The different types of nodes in the AST
 (add-ns ast (git-dependency "https://github.com/Toccata-Lang/ast.git"
                             "ast.toc"
-                            :sha "792416c"))
+                            :sha "dad9d56"))
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
-                          :sha "90b9152"))
+                          :sha "1ec77e5"))
 (defn min [x y]
   (either (< x y)
           y))
@@ -74,7 +74,7 @@
 
 (def read-open-paren
   (grmr/rule "open-paren"
-             (grmr/ignore (grmr/all ignore-whitespace "(" ignore-whitespace))))
+             (grmr/ignore (grmr/all ignore-whitespace "("))))
 
 (def read-close-paren
   (grmr/rule "close-paren"
@@ -83,7 +83,7 @@
 
 (def read-open-bracket
   (grmr/rule "open-bracket"
-             (grmr/any (grmr/ignore (grmr/all ignore-whitespace "[" ignore-whitespace))
+             (grmr/any (grmr/ignore (grmr/all ignore-whitespace "["))
                        (grmr/error "Missing \"[\"."))))
 
 (def read-close-bracket
@@ -143,9 +143,6 @@
                        symbol-start
                        rest-of-symbol)))
 
-(def read-sub-dest
-  (grmr/recurse "destructure"))
-
 (def read-arg
   (grmr/rule "arg"
              (apply-to comp
@@ -159,12 +156,16 @@
                                  ignore-whitespace
                                  (grmr/ignore "&")
                                  read-arg)
-                       (grmr/always c/no-var-arg))))
+                       (grmr/always c/no-symbol))))
+
+(def read-sub-dest
+  (grmr/recurse "destructure"))
 
 (def read-list-destructure
   (grmr/rule "list-destructure"
              (apply-to ast/params
-                       read-open-bracket
+                       ignore-whitespace
+                       (grmr/ignore "[")
                        (grmr/none-or-more read-sub-dest)
                        read-var-arg
                        read-close-bracket)))
@@ -857,8 +858,7 @@
                                  ignore-whitespace
                                  (grmr/ignore "[")
                                  (grmr/one-or-more read-sub-dest)
-                                 (grmr/any (apply-to maybe read-var-arg)
-                                           (grmr/always nothing))
+                                 read-var-arg
                                  read-close-bracket)
                        read-fn-doc
                        (grmr/any read-inline-body
@@ -1201,11 +1201,14 @@
                                  ;; read-block-comment
                                  ;; read-main
                                  ;; read-JS-callable
-                                 ;; read-inline
+                                 read-inline
                                  ;; read-add-ns
                                  ;; read-show-type
                                  ;; read-is-type
                                  ;; shebang
                                  bad-expr
                                  ;; TODO: detect end of input
+
+                                 ;; TODO: remove when read-destructure is used somewhere
+                                 read-destructure
                                  ))))
