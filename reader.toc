@@ -11,12 +11,11 @@
 ;; The different types of nodes in the AST
 (add-ns ast (git-dependency "https://github.com/Toccata-Lang/ast.git"
                             "ast.toc"
-                            :sha "761a34b"))
+                            :sha "792416c"))
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
-                          :sha "ac144e4"))
-
+                          :sha "90b9152"))
 (defn min [x y]
   (either (< x y)
           y))
@@ -29,6 +28,68 @@
                           (str "\"" (subs text 0 (min 40 (count text))) "\"")))
              (grmr/get-value 'file-name)
              grmr/get-text)))
+
+(def not-eol
+  (grmr/rule "not-eol"
+             (grmr/not-char "\n")))
+
+(def linear-whitespace
+  (grmr/rule "linear-whitespace"
+             (grmr/any "," " " "\t")))
+
+(def ignore-linear-whitespace (grmr/ignore (grmr/none-or-more linear-whitespace)))
+
+(def newline
+  (grmr/rule "newline"
+             (apply-to identity
+                       (grmr/string-terminal "\n")
+                       (grmr/ignore (grmr/update-value 'line-number inc)))))
+
+(def ignore-newlines (grmr/ignore (grmr/none-or-more newline)))
+
+(def whitespace
+  (grmr/rule "whitespace"
+             (grmr/any (grmr/all (grmr/one-or-more ";")
+                                 (grmr/none-or-more not-eol)
+                                 newline)
+                       linear-whitespace
+                       "\r"
+                       newline)))
+
+(def ignore-whitespace (grmr/ignore (grmr/none-or-more whitespace)))
+
+(def read-block-comment
+  (grmr/rule "block-comment"
+             (apply-to ast/block-comment
+                       (grmr/get-value 'file-name)
+                       (grmr/get-value 'line-number)
+                       (grmr/one-or-more
+                        (apply-to to-str
+                                  (grmr/ignore (grmr/none-or-more (grmr/any linear-whitespace
+                                                                            "\r"
+                                                                            newline)))
+                                  (grmr/ignore (grmr/one-or-more ";"))
+                                  (grmr/none-or-more not-eol)
+                                  (grmr/ignore newline))))))
+
+(def read-open-paren
+  (grmr/rule "open-paren"
+             (grmr/ignore (grmr/all ignore-whitespace "(" ignore-whitespace))))
+
+(def read-close-paren
+  (grmr/rule "close-paren"
+             (grmr/any (grmr/ignore (grmr/all ignore-whitespace ")"))
+                       (grmr/error "Missing \")\"."))))
+
+(def read-open-bracket
+  (grmr/rule "open-bracket"
+             (grmr/any (grmr/ignore (grmr/all ignore-whitespace "[" ignore-whitespace))
+                       (grmr/error "Missing \"[\"."))))
+
+(def read-close-bracket
+  (grmr/rule "close-bracket"
+             (grmr/any (grmr/ignore (grmr/all ignore-whitespace "]"))
+                       (grmr/error "Missing \"]\"."))))
 
 (def symbol-start
   (grmr/rule "symbol-start"
@@ -75,12 +136,43 @@
                                               (symbol (to-str (comp [start] the-rest)))
                                               (symbol (to-str (comp (list ns-prefix start)
                                                                     the-rest)))
-                                              file-name line-number c/top-type)))
+                                              (c/Location file-name line-number) c/top-type)))
                        (grmr/get-value 'file-name)
                        (grmr/get-value 'line-number)
                        (grmr/optional read-namespace c/no-symbol)
                        symbol-start
                        rest-of-symbol)))
+
+(def read-sub-dest
+  (grmr/recurse "destructure"))
+
+(def read-arg
+  (grmr/rule "arg"
+             (apply-to comp
+                       ignore-whitespace
+                       read-symbol
+                       ignore-whitespace)))
+
+(def read-var-arg
+  (grmr/rule "var-arg"
+             (grmr/any (apply-to identity
+                                 ignore-whitespace
+                                 (grmr/ignore "&")
+                                 read-arg)
+                       (grmr/always c/no-var-arg))))
+
+(def read-list-destructure
+  (grmr/rule "list-destructure"
+             (apply-to ast/params
+                       read-open-bracket
+                       (grmr/none-or-more read-sub-dest)
+                       read-var-arg
+                       read-close-bracket)))
+
+(def read-destructure
+  (grmr/rule read-sub-dest
+             (grmr/any read-list-destructure
+                       read-arg)))
 
 (def read-string-newline
   (grmr/rule "newline"
@@ -116,10 +208,6 @@
   (grmr/rule "backslash"
              (apply-to (fn [& _] "\\")
                        (grmr/all "\\" "\\"))))
-
-(def not-eol
-  (grmr/rule "not-eol"
-             (grmr/not-char "\n")))
 
 (defn string-frag-len [s]
   (assert (instance? String s))
@@ -164,7 +252,8 @@
   (grmr/rule "string"
              (apply-to (fn [file-name line-num frags]
                          ;; TODO: could fully specify the int constraint here
-                         (ast/string-ast (to-str frags) file-name line-num c/strbuff-constraint))
+                         (ast/string-ast (to-str frags) (c/Location file-name line-num)
+                                         c/strbuff-constraint))
                        (grmr/ignore "\"")
                        (grmr/get-value 'file-name)
                        (grmr/get-value 'line-number)
@@ -194,207 +283,25 @@
              (grmr/any (apply-to (fn [file-name line-num digits]
                                    ;; TODO: could fully specify the int constraint here
                                    (ast/integer-ast (str-to-int (to-str digits))
-                                                    file-name line-num c/int-constraint))
+                                                    (c/Location file-name line-num) c/int-constraint))
                                  (grmr/get-value 'file-name)
                                  (grmr/get-value 'line-number)
                                  (grmr/one-or-more grmr/digit))
                        (apply-to (fn [file-name line-num digits]
                                    ;; TODO: could fully specify the int constraint here
                                    (ast/integer-ast (* -1 (str-to-int (to-str digits)))
-                                                    file-name line-num c/int-constraint))
+                                                    (c/Location file-name line-num) c/int-constraint))
                                  (grmr/get-value 'file-name)
                                  (grmr/get-value 'line-number)
                                  (grmr/ignore "-")
                                  (grmr/one-or-more grmr/digit)))))
-
-(def read-sub-expr
-  (grmr/recurse "expr"))
-
-(def linear-whitespace
-  (grmr/rule "linear-whitespace"
-             (grmr/any "," " " "\t")))
-
-(def ignore-linear-whitespace (grmr/ignore (grmr/none-or-more linear-whitespace)))
-
-(def newline
-  (grmr/rule "newline"
-             (apply-to identity
-                       (grmr/string-terminal "\n")
-                       (grmr/ignore (grmr/update-value 'line-number inc)))))
-
-(def ignore-newlines (grmr/ignore (grmr/none-or-more newline)))
-
-(def read-block-comment
-  (grmr/rule "block-comment"
-             (apply-to ast/block-comment
-                       (grmr/get-value 'file-name)
-                       (grmr/get-value 'line-number)
-                       (grmr/one-or-more
-                        (apply-to to-str
-                                  (grmr/ignore (grmr/none-or-more (grmr/any linear-whitespace
-                                                                            "\r"
-                                                                            newline)))
-                                  (grmr/ignore (grmr/one-or-more ";"))
-                                  (grmr/none-or-more not-eol)
-                                  (grmr/ignore newline))))))
-
-(def whitespace
-  (grmr/rule "whitespace"
-             (grmr/any (grmr/all (grmr/one-or-more ";")
-                                 (grmr/none-or-more not-eol)
-                                 newline)
-                       linear-whitespace
-                       "\r"
-                       newline)))
-
-(def ignore-whitespace (grmr/ignore (grmr/none-or-more whitespace)))
-
-(def read-arg
-  (grmr/rule "arg"
-             (apply-to comp
-                       ignore-whitespace
-                       read-symbol
-                       ignore-whitespace)))
-
-(def read-var-arg
-  (grmr/rule "var-arg"
-             (apply-to identity
-                       ignore-whitespace
-                       (grmr/ignore "&")
-                       read-arg)))
-
-(def read-open-paren
-  (grmr/rule "open-paren"
-             (grmr/ignore (grmr/all ignore-whitespace "(" ignore-whitespace))))
-
-(def read-close-paren
-  (grmr/rule "close-paren"
-             (grmr/any (grmr/ignore (grmr/all ignore-whitespace ")"))
-                       (grmr/error "Missing \")\"."))))
-
-(def read-open-bracket
-  (grmr/rule "open-bracket"
-             (grmr/any (grmr/ignore (grmr/all ignore-whitespace "[" ignore-whitespace))
-                       (grmr/error "Missing \"[\"."))))
-
-(def read-close-bracket
-  (grmr/rule "close-bracket"
-             (grmr/any (grmr/ignore (grmr/all ignore-whitespace "]"))
-                       (grmr/error "Missing \"]\"."))))
-
-(def read-call
-  (grmr/rule "call"
-             (apply-to ast/call-expr
-                       read-open-paren
-                       (grmr/one-or-more read-sub-expr)
-                       read-close-paren)))
-
-(def read-sub-dest
-  (grmr/recurse "destructure"))
-
-(def read-list-destructure
-  (grmr/rule "list-destructure"
-             (apply-to ast/params
-                       ;; TODO: should this use 'open-bracker'?
-                       ignore-whitespace
-                       (grmr/ignore "[")
-                       (grmr/none-or-more read-sub-dest)
-                       (grmr/any (apply-to maybe read-var-arg)
-                                 (grmr/always nothing))
-                       read-close-bracket)))
-
-(def read-destructure
-  (grmr/rule read-sub-dest
-             (grmr/any read-list-destructure
-                       read-arg)))
-
-(def read-let-binding
-  (grmr/rule "let-binding"
-             (apply-to ast/binding
-                       ignore-whitespace
-                       read-destructure
-                       read-sub-expr)))
-
-(def read-let
-  (grmr/rule "let"
-             (apply-to identity
-                       read-open-paren
-                       (grmr/ignore "let")
-                       ignore-whitespace
-                       (grmr/ignore "[")
-                       (grmr/any (apply-to ast/let-expr
-                                           (grmr/one-or-more read-let-binding)
-                                           read-close-bracket
-                                           (grmr/one-or-more read-sub-expr)
-                                           read-close-paren)
-                                 (grmr/error "Invalid 'let' expression")))))
-
-(def read-do
-  (grmr/rule "do"
-             (apply-to (partial ast/let-expr [])
-                       read-open-paren
-                       (grmr/ignore "do")
-                       (grmr/ignore (grmr/one-or-more whitespace))
-                       (grmr/one-or-more read-sub-expr)
-                       read-close-paren)))
-
-(def read-or
-  (grmr/rule "or"
-             (apply-to ast/or-expr
-                       read-open-paren
-                       (grmr/ignore "or")
-                       (grmr/ignore (grmr/one-or-more whitespace))
-                       (grmr/any (grmr/one-or-more read-sub-expr)
-                                 (grmr/error "An 'or' expression must contain at least one clause."))
-                       read-close-paren)))
-
-(def read-and
-  (grmr/rule "and"
-             (apply-to ast/and-expr
-                       read-open-paren
-                       (grmr/ignore "and")
-                       (grmr/ignore (grmr/one-or-more whitespace))
-                       (grmr/any (grmr/one-or-more read-sub-expr)
-                                 (grmr/error "An 'and' expression must contain at least one clause."))
-                       read-close-paren)))
-
-(def read-either
-  (grmr/rule "either"
-             (apply-to ast/either-expr
-                       read-open-paren
-                       (grmr/ignore "either")
-                       (grmr/ignore (grmr/one-or-more whitespace))
-                       read-sub-expr
-                       (grmr/any read-sub-expr
-                                 (grmr/error "Missing 'either' clause."))
-                       read-close-paren)))
-
-(def read-cond-val
-  (grmr/rule "cond-value"
-             (apply-to ast/cond-val-expr
-                       read-sub-expr
-                       read-sub-expr)))
-
-(def read-cond
-  (grmr/rule "cond"
-             (apply-to ast/cond-expr
-                       read-open-paren
-                       (grmr/ignore "cond")
-                       (grmr/ignore (grmr/one-or-more whitespace))
-                       (grmr/one-or-more read-cond-val)
-                       (grmr/any read-sub-expr
-                                 (grmr/error "Missing 'cond' default clause."))
-                       read-close-paren)))
-
-(def ListOrVect (any-of c/VectorConstraint
-                        c/ListConstraint))
 
 (defn assert-min-count [file-name line-number len]
   ;; TODO: what was I thinking doing it this way. (Actually, I know.)
   (-> c/seq-constraint
       (c/set-items (repeat len c/top-type))
       (c/set-tail c/coll-of-any)
-      (c/update-path file-name line-number)))
+      (c/update-path (c/Location file-name line-number))))
 
 ;; TODO: might be useful to have a max count
 (def read-min-count-assertion
@@ -414,7 +321,7 @@
 (defn assert-max-value [file-name line-number max]
   (-> c/int-constraint
       (assoc-in [.fields 'max] max)
-      (c/update-path file-name line-number)))
+      (c/update-path (c/Location file-name line-number))))
 
 (def read-max-val-assertion
   (grmr/rule "assert-max"
@@ -432,7 +339,7 @@
 (defn assert-min-value [file-name line-number min]
   (-> c/int-constraint
       (assoc-in [.fields 'min] min)
-      (c/update-path file-name line-number)))
+      (c/update-path (c/Location file-name line-number))))
 
 (def read-min-val-assertion
   (grmr/rule "assert-min"
@@ -454,7 +361,7 @@
   (grmr/rule "result-of"
              (apply-to (fn [file line c]
                          (-> (c/type-op c/call-value-op c c/no-args)
-                             (c/update-path file line)))
+                             (c/update-path (c/Location file line))))
                        read-open-paren
                        (grmr/ignore "result-of")
                        (grmr/get-value 'file-name)
@@ -472,7 +379,7 @@
              (apply-to (fn [file line c arg-cs]
                          (let [arg-cs (comp* [] (seq arg-cs))]
                            (-> (c/type-op c/call-value-op c arg-cs)
-                               (c/update-path file line))))
+                               (c/update-path (c/Location file line)))))
                        read-open-paren
                        (grmr/ignore "call-fn")
                        (grmr/get-value 'file-name)
@@ -498,7 +405,7 @@
   (grmr/rule "inner-type-of"
              (apply-to (fn [file line c]
                          (-> (.base c/inner-type-of c)
-                             (c/update-path file line)))
+                             (c/update-path (c/Location file line))))
                        read-open-paren
                        ignore-whitespace
                        (grmr/ignore "inner-type-of")
@@ -517,7 +424,7 @@
              (apply-to (fn [file line sym]
                          (-> c/type-of-constraint
                              (.param-sym (ast/untag sym))
-                             (c/update-path file line)))
+                             (c/update-path (c/Location file line))))
                        read-open-paren
                        ignore-whitespace
                        (grmr/ignore "type-of")
@@ -531,7 +438,7 @@
   (grmr/rule "type-of-arg"
              (apply-to (fn [file line c arg-pos]
                          (-> (c/type-op c/arg-of-op c (.int arg-pos))
-                             (c/update-path file line)))
+                             (c/update-path (c/Location file line))))
                        read-open-paren
                        ignore-whitespace
                        (grmr/ignore "type-of-arg")
@@ -550,7 +457,7 @@
              (apply-to (fn [file line arg-counts]
                          ;; ! (vector-of Integer) arg-counts
                          (-> (.required-arities c/fn-constraint arg-counts)
-                             (c/update-path file line)))
+                             (c/update-path (c/Location file line))))
                        read-open-paren
                        ignore-whitespace
                        (grmr/ignore "required-arities")
@@ -572,7 +479,7 @@
 
       ;;               c)))
       c/hashmap-constraint
-      (c/update-path (ast/file-name key-type) (ast/line-number key-type))))
+      (c/update-path (ast/location key-type))))
 
 (def read-map-assertion
   (grmr/rule "assert-map-of"
@@ -653,7 +560,7 @@
                                        (print-err "No generic type" (str "'" base-string "'")
                                                   "exists. At" file ": " line)
                                        (abort)))
-                             (c/update-path file line)))
+                             (c/update-path (c/Location file line))))
                        read-open-paren
                        ignore-whitespace
                        (apply grmr/any (keys generic-assertions))
@@ -666,7 +573,7 @@
   (grmr/rule "apply-fn"
              (apply-to (fn [file line c arg-cs]
                          (-> (c/type-op c/apply-op c arg-cs)
-                             (c/update-path file line)))
+                             (c/update-path (c/Location file line))))
                        read-open-paren
                        (grmr/ignore "apply-fn")
                        (grmr/get-value 'file-name)
@@ -698,7 +605,7 @@
                          (-> seq-constraint
                              (c/set-items item-types)
                              (c/set-tail tail-type)
-                             (c/update-path file line)))
+                             (c/update-path (c/Location file line))))
                        read-open-paren
                        ignore-whitespace
                        (grmr/get-value 'file-name)
@@ -721,7 +628,7 @@
                          (-> seq-constraint
                              (c/set-items items-types)
                              (c/set-tail tail-type)
-                             (c/update-path file line)))
+                             (c/update-path (c/Location file line))))
                        read-open-paren
                        ignore-whitespace
                        (grmr/get-value 'file-name)
@@ -731,9 +638,7 @@
                                  (grmr/all (grmr/ignore "vector-as")
                                            (grmr/always c/vect-constraint)))
                        (apply-to identity
-                                 ;; TODO: should this use 'open-bracker'?
-                                 ignore-whitespace
-                                 (grmr/ignore "[")
+                                 read-open-bracket
                                  (grmr/none-or-more read-sub-type)
                                  read-close-bracket)
                        (grmr/optional read-sub-type c/no-tail)
@@ -743,7 +648,7 @@
   (grmr/rule "concat"
              (apply-to (fn [file line c]
                          (-> (c/type-op c/concat-op c c/no-args)
-                             (c/update-path file line)))
+                             (c/update-path (c/Location file line))))
                        read-open-paren
                        (grmr/ignore "concat")
                        (grmr/get-value 'file-name)
@@ -772,11 +677,11 @@
                                       (fn [op-c]
                                         (-> (cata (fn [inner]
                                                     (cond (instance? c/TypeOp inner)
-                                                          (.base inner (c/update-path c file line))
+                                                          (.base inner (c/update-path c (c/Location file line)))
 
                                                           inner))
                                                   op-c)
-                                            (c/update-path file line))))
+                                            (c/update-path (c/Location file line)))))
                                  (do
                                    (print-err "No modified sequence type" (str "'" base-string "'")
                                               "exists. At" file ": " line)
@@ -790,19 +695,6 @@
                        (apply-to (fn [sym]
                                    (c/TypeOfConstraint sym empty-list c/no-symbol ""))
                                  read-symbol)
-                       read-close-paren)))
-
-(def read-show-type
-  (grmr/rule "show-type"
-             (apply-to (fn [file line expr]
-                         (ast/call-expr [(ast/tag "show-type" file line) expr]))
-                       read-open-paren
-                       ignore-whitespace
-                       (grmr/ignore "show-type")
-                       (grmr/get-value 'file-name)
-                       (grmr/get-value 'line-number)
-                       ignore-whitespace
-                       read-sub-expr
                        read-close-paren)))
 
 (defn assert-type [type-sym]
@@ -856,7 +748,8 @@
                                  (grmr/ignore "assert")
                                  (grmr/ignore (grmr/one-or-more whitespace))
                                  (grmr/any read-type-assertion
-                                           read-show-type
+                                           ;; put this in if needed
+                                           ;; read-show-type
                                            (grmr/error "Missing type assertion in 'assert' expression."))
                                  read-close-paren)
                        (apply-to (fn [sym c]
@@ -885,7 +778,8 @@
                                  (grmr/ignore (grmr/optional read-symbol))
                                  (grmr/ignore (grmr/one-or-more whitespace))
                                  (grmr/any read-type-assertion
-                                           read-show-type
+                                           ;; put this in if needed
+                                           ;; read-show-type
                                            read-seq-type
                                            (grmr/error "Missing type assertion in 'assert-result' expression."))
                                  read-close-paren)
@@ -899,37 +793,6 @@
                                  (grmr/ignore (grmr/none-or-more not-eol))
                                  (grmr/ignore newline)))))
 
-(def read-apply-to
-  (grmr/rule "apply-to"
-             (apply-to identity
-                       (grmr/ignore "(")
-                       ignore-whitespace
-                       (grmr/ignore "apply-to")
-                       (grmr/ignore (grmr/one-or-more whitespace))
-                       (grmr/any (apply-to
-                                  (fn [fn ln f arg args]
-                                    (let [file-name (ast/file-name f)
-                                          line-number (ast/line-number f)
-                                          apply* (ast/tag 'apply file-name line-number)
-                                          wrap* (ast/tag 'wrap file-name line-number)
-                                          list (ast/tag 'list file-name line-number)]
-                                      (ast/let-expr
-                                       [(ast/binding-ast (ast/tag "#x" fn ln) arg)]
-                                       [(ast/call-expr
-                                         [apply*
-                                          (ast/call-expr [wrap* (ast/tag "#x" fn ln) f])
-                                          (ast/call-expr (list* list arg (seq args)))])])))
-                                  (grmr/get-value 'file-name)
-                                  (grmr/get-value 'line-number)
-                                  read-sub-expr
-                                  (grmr/any read-sub-expr
-                                            (grmr/error "An 'apply-to' expression must have at least"
-                                                        "one parameter expression."))
-                                  (grmr/none-or-more read-sub-expr)
-                                  ignore-whitespace
-                                  read-close-paren)
-                                 (grmr/error "Invalid 'apply-to' form.")))))
-
 (def read-inline
   (grmr/rule "read-inline"
              (apply-to identity
@@ -938,7 +801,7 @@
                        (grmr/ignore (grmr/one-or-more whitespace))
                        (grmr/any (apply-to (fn [file-name line-number lang return-type body]
                                              (ast/inline-ast lang return-type
-                                                             body file-name line-number))
+                                                             body (c/Location file-name line-number)))
                                            (grmr/get-value 'file-name)
                                            (grmr/get-value 'line-number)
                                            (grmr/any read-symbol
@@ -968,6 +831,16 @@
                        read-inline
                        (grmr/ignore (grmr/none-or-more read-block-comment)))))
 
+(def read-sub-expr
+  (grmr/recurse "expr"))
+
+(def read-call
+  (grmr/rule "call"
+             (apply-to ast/call-expr
+                       read-open-paren
+                       (grmr/one-or-more read-sub-expr)
+                       read-close-paren)))
+
 (def read-fn-doc
   (grmr/rule "fn-doc"
              (grmr/any read-block-comment
@@ -975,43 +848,6 @@
                                    (ast/block-comment fn ln [""]))
                                  (grmr/get-value 'file-name)
                                  (grmr/get-value 'line-number)))))
-
-(def read-single-arity
-  (grmr/rule "single-arity"
-             (apply-to (fn [params doc body]
-                         (ast/fn-arity params doc body))
-                       read-list-destructure
-                       read-fn-doc
-                       (grmr/any read-inline-body
-                                 (grmr/one-or-more read-sub-expr)
-                                 (grmr/error "Body of function is wrong."))
-                       ignore-whitespace)))
-
-(def read-arities
-  (grmr/rule "arities"
-             (grmr/any (apply-to vector read-single-arity)
-                       (apply-to (fn [doc arities]
-                                   (map arities (fn [arity]
-                                                  (.doc arity doc))))
-                                 read-fn-doc
-                                 (grmr/one-or-more (apply-to identity
-                                                             read-open-paren
-                                                             read-single-arity
-                                                             read-close-paren))))))
-
-(def read-fn
-  (grmr/rule "fn"
-             (apply-to identity
-                       read-open-paren
-                       (grmr/ignore "fn")
-                       (grmr/ignore (grmr/one-or-more whitespace))
-                       (grmr/any (apply-to (fn [name arities]
-                                             (ast/fn-expr name arities))
-                                           (grmr/optional read-symbol c/no-symbol)
-                                           ignore-whitespace
-                                           read-arities
-                                           read-close-paren)
-                                 (grmr/error "Invalid 'fn' expression.")))))
 
 (def read-impl-arity
   (grmr/rule "impl-arity"
@@ -1076,7 +912,8 @@
 (def curr-file-name
   (grmr/rule "_FILE_"
              (apply-to (fn [file-name line-num]
-                         (ast/string-ast file-name file-name line-num c/strbuff-constraint))
+                         (ast/string-ast file-name (c/Location file-name line-num)
+                                         c/strbuff-constraint))
                        ignore-whitespace
                        (grmr/ignore "_FILE_")
                        (grmr/get-value 'file-name)
@@ -1094,7 +931,7 @@
              (apply-to identity
                        (grmr/ignore "[")
                        (apply-to (fn [fn ln elems]
-                                   (ast/call-expr (cons (ast/tag 'vector fn ln)
+                                   (ast/call-expr (cons (ast/tag 'vector (c/Location fn ln))
                                                         (seq elems))))
                                  (grmr/get-value 'file-name)
                                  (grmr/get-value 'line-number)
@@ -1106,7 +943,7 @@
              (apply-to identity
                        (grmr/ignore "{")
                        (apply-to (fn [fn ln elems]
-                                   (ast/call-expr (cons (ast/tag 'hash-map fn ln)
+                                   (ast/call-expr (cons (ast/tag 'hash-map (c/Location fn ln))
                                                         (comp* empty-list elems))))
                                  (grmr/get-value 'file-name)
                                  (grmr/get-value 'line-number)
@@ -1120,7 +957,7 @@
              (apply-to identity
                        (grmr/ignore "#{")
                        (apply-to (fn [fn ln elems]
-                                   (ast/call-expr (cons (ast/tag 'hash-set fn ln)
+                                   (ast/call-expr (cons (ast/tag 'hash-set (c/Location fn ln))
                                                         (seq elems))))
                                  (grmr/get-value 'file-name)
                                  (grmr/get-value 'line-number)
@@ -1161,11 +998,10 @@
                       :let [frms (rest quoted-list)]
                       contents (or (empty? frms)
                                    (maybe (map frms quote-literal)))]
-                  (ast/call-ast (ast/tag 'vector (ast/file-name quoted-list)
-                                     (ast/line-number quoted-list))
+                  (ast/call-ast (ast/tag 'vector (ast/location quoted-list))
                                 (vec contents)
                                 c/top-type)))
-            (ast/call-ast (ast/tag 'list (ast/file-name quoted-list) (ast/line-number quoted-list))
+            (ast/call-ast (ast/tag 'list (ast/location quoted-list))
                           (vec (map quoted-list quote-literal))
                           c/top-type))))
 
@@ -1182,10 +1018,10 @@
                       :let [frms (rest quoted-vect)]
                       contents (or (empty? frms)
                                    (maybe (map frms quote-literal)))]
-                  (ast/call-ast (ast/tag 'vector (ast/file-name quoted-vect) (ast/line-number quoted-vect))
+                  (ast/call-ast (ast/tag 'vector (ast/location quoted-vect))
                                 contents
                                 c/top-type)))
-            (ast/call-ast (ast/tag 'list (ast/file-name quoted-vect) (ast/line-number quoted-vect))
+            (ast/call-ast (ast/tag 'list (ast/location quoted-vect))
                           (map quoted-vect quote-literal)
                           c/top-type))))
 
@@ -1214,237 +1050,6 @@
              (apply-to quote-literal
                        (grmr/ignore "'")
                        read-quoted-value)))
-
-(defprotocol ForBinding
-  (nest-let [body bindings]
-    (ast/let-expr bindings [body]))
-
-  (nest-when [body clause wrapper]
-    (let [fn (ast/file-name clause)
-          ln (ast/line-number clause)]
-      (ast/cond-expr
-       [(ast/cond-val-expr clause body)]
-       (ast/call-ast (ast/tag 'zero fn ln)
-                     [wrapper]
-                     c/top-type))))
-
-  (nest-when-not [body clause wrapper]
-    (let [fn (ast/file-name clause)
-          ln (ast/line-number clause)]
-      (ast/cond-expr
-       [(ast/cond-val-expr clause (ast/call-ast (ast/tag 'zero fn ln)
-                                                [wrapper]
-                                                c/top-type))]
-       body)))
-
-  (nest-binding [body binding wrapper]))
-
-(extend-type ast/let-ast
-  ForBinding
-  (nest-binding [body binding wrapper]
-    (ast/call-ast (ast/tag 'flat-map (ast/file-name binding) (ast/line-number binding))
-                  [(.val binding)
-                   (ast/fn-expr c/no-symbol
-                                [(ast/fn-arity (ast/params [(.binding binding)]) ""
-                                               [body])])]
-                  c/top-type)))
-
-(extend-type ast/call-ast
-  ForBinding
-  (nest-binding [body binding wrapper]
-    (ast/call-ast (ast/tag 'flat-map (ast/file-name binding) (ast/line-number binding))
-                  [(.val binding)
-                   (ast/fn-expr c/no-symbol
-                                [(ast/fn-arity (ast/params [(.binding binding)]) ""
-                                               [body])])]
-                  c/top-type)))
-
-(extend-type ast/either-ast
-  ForBinding
-  (nest-binding [body binding wrapper]
-    (ast/call-ast (ast/tag 'flat-map (ast/file-name binding) (ast/line-number binding))
-                  [(.val binding)
-                   (ast/fn-expr c/no-symbol
-                                [(ast/fn-arity (ast/params [(.binding binding)]) ""
-                                               [body])])]
-                  c/top-type)))
-
-(extend-type ast/cond-ast
-  ForBinding
-  (nest-binding [body binding wrapper]
-    (ast/call-ast (ast/tag 'flat-map (ast/file-name binding) (ast/line-number binding))
-                  [(.val binding)
-                   (ast/fn-expr c/no-symbol
-                                [(ast/fn-arity (ast/params [(.binding binding)]) ""
-                                               [body])])]
-                  c/top-type)))
-
-(extend-type ast/binding-ast
-  ForBinding
-  (nest-binding [b body wrapper]
-    (nest-binding body b wrapper)))
-
-(deftype ForLetExpr [bindings]
-  (assert (instance? Vector bindings))
-
-  Stringable
-  (string-list [_] (comp (list "<ForLet")
-                         (string-list bindings)
-                         (list ">")))
-
-  ForBinding
-  (nest-binding [_ body wrapper]
-    (nest-let body bindings)))
-
-(def read-for-let
-  (grmr/rule "for-let"
-             (apply-to (fn [bindings]
-                         (ForLetExpr bindings))
-                       ignore-whitespace
-                       (grmr/ignore ":let")
-                       (grmr/ignore (grmr/one-or-more whitespace))
-                       read-open-bracket
-                       (grmr/one-or-more read-let-binding)
-                       read-close-bracket
-                       ignore-whitespace)))
-
-(deftype ForWhenExpr [value]
-  Stringable
-  (string-list [_] (comp (list "<ForWhen")
-                         (string-list value)
-                         (list ">")))
-
-  ForBinding
-  (nest-binding [_ body wrapper]
-    (nest-when body value wrapper)))
-
-(def read-for-when
-  (grmr/rule "for-when"
-             (apply-to (fn [clause]
-                         (ForWhenExpr clause))
-                       ignore-whitespace
-                       (grmr/ignore ":when")
-                       (grmr/ignore (grmr/one-or-more whitespace))
-                       read-sub-expr)))
-
-(deftype ForWhenNotExpr [value]
-  Stringable
-  (string-list [_] (comp (list "<ForWhenNot")
-                         (string-list value)
-                         (list ">")))
-
-  ForBinding
-  (nest-binding [_ body wrapper]
-    (nest-when-not body value wrapper)))
-
-(def read-for-when-not
-  (grmr/rule "for-when-not"
-             (apply-to (fn [clause]
-                         (ForWhenNotExpr clause))
-                       ignore-whitespace
-                       (grmr/ignore ":when-not")
-                       (grmr/ignore (grmr/one-or-more whitespace))
-                       read-sub-expr)))
-
-(deftype ForResultExpr [body]
-  ForBinding
-  (nest-let [_ bindings]
-    (ForResultExpr (nest-let body bindings)))
-
-  (nest-when [_ clause wrapper]
-    (let [fn (ast/file-name clause)
-          ln (ast/line-number clause)]
-      (ast/call-ast
-       (ast/tag 'flat-map fn ln)
-       [(ast/cond-expr [(ast/cond-val-expr clause (ast/call-ast (ast/tag 'wrap fn ln)
-                                                                [wrapper body]
-                                                                c/top-type))]
-                       (ast/call-ast (ast/tag 'zero fn ln)
-                                     [wrapper]
-                                     c/top-type))
-        (ast/fn-expr c/no-symbol
-                     [(ast/fn-arity (ast/params [(ast/tag "#x" fn ln)]) ""
-                                    [(ast/call-ast (ast/tag 'wrap fn ln)
-                                                   [wrapper (ast/tag "#x" fn ln)]
-                                                   c/top-type)])])]
-       c/top-type)))
-
-  (nest-when-not [_ clause wrapper]
-    (let [fn (ast/file-name clause)
-          ln (ast/line-number clause)]
-      (ast/call-ast
-       (ast/tag 'flat-map fn ln)
-       [(ast/cond-expr [(ast/cond-val-expr clause (ast/call-ast (ast/tag 'zero fn ln) [wrapper] c/top-type))]
-                      (ast/call-ast (ast/tag 'wrap fn ln) [wrapper body] c/top-type))
-        (ast/fn-expr c/no-symbol
-                     [(ast/fn-arity (ast/params [(ast/tag "#x" fn ln)]) ""
-                                    [(ast/call-ast (ast/tag 'wrap fn ln)
-                                                   [wrapper (ast/tag "#x" fn ln)]
-                                                   c/top-type)])])]
-       c/top-type)))
-
-  (nest-binding [_ binding wrapper]
-    (let [fn (ast/file-name binding)
-          ln (ast/line-number binding)]
-      (ast/call-ast (ast/tag 'map fn ln)
-                    [(.val binding)
-                     (ast/fn-expr c/no-symbol
-                                  [(ast/fn-arity (ast/params [(.binding binding)]) ""
-                                                 [body])])]
-                    c/top-type)))
-
-  Stringable
-  (string-list [_] (comp (list "<ForResult ")
-                         (string-list body)
-                         (list ">"))))
-
-(defn nest-for-exprs [bogus bindings body]
-  (let [wrapper (ast/tag "#wrapper"
-                         (ast/file-name (.val bogus))
-                         (ast/line-number (.val bogus)))]
-    (-> (list (ForLetExpr [(ast/binding wrapper (.val bogus))])
-              (ast/binding (.binding bogus) wrapper))
-        (comp (remove bindings (partial instance? ast/NoCode)))
-        reverse
-        (reduce (ForResultExpr body)
-                (fn [body expr]
-                  (nest-binding expr body wrapper))))))
-
-(def read-for-binding
-  (grmr/rule "for-binding"
-             (grmr/any read-for-let
-                       read-for-when
-                       read-for-when-not
-                       read-let-binding
-                       (apply-to identity
-                                 read-block-comment
-                                 ignore-whitespace))))
-
-(def read-for
-  (grmr/rule "for"
-             (apply-to identity
-                       read-open-paren
-                       (grmr/ignore "for")
-                       (grmr/ignore (grmr/one-or-more whitespace))
-                       (grmr/any (apply-to nest-for-exprs
-                                           read-open-bracket
-                                           (grmr/any read-let-binding
-                                                     (grmr/error "Invalid initial 'for' binding."))
-                                           (grmr/any (grmr/none-or-more read-for-binding)
-                                                     (grmr/error "Invalid 'for' bindings."))
-                                           read-close-bracket
-                                           (grmr/any (grmr/any read-sub-expr
-                                                               (grmr/error "The body of a 'for' expression"
-                                                                           " must have a single"
-                                                                           " expression in it."))
-                                                     (grmr/error "Invalid 'for' body.")))
-                                 (grmr/error "Invalid 'for' expression."))
-                       (grmr/any (grmr/ignore
-                                  (grmr/all read-sub-expr
-                                            (grmr/error "The body of a 'for'"
-                                                        "expression may only have"
-                                                        "one expression in it.")))
-                                 read-close-paren))))
 
 (defn nest-thread-exprs [first-expr exprs]
   (let [[first-expr & exprs] (remove (cons first-expr (seq exprs))
@@ -1489,19 +1094,19 @@
                                  curr-line
                                  read-symbol
                                  read-quoted
-                                 read-or
-                                 read-and
-                                 read-either
-                                 read-cond
-                                 read-fn
-                                 read-let
-                                 read-do
-                                 read-apply-to
+                                 ;; read-or
+                                 ;; read-and
+                                 ;; read-either
+                                 ;; read-cond
+                                 ;; read-fn
+                                 ;; read-let
+                                 ;; read-do
+                                 ;; read-apply-to
                                  read-reify
                                  read-vector
                                  read-hash-map
                                  read-hash-set
-                                 read-for
+                                 ;; read-for
                                  read-threading
                                  read-assert
                                  read-assert-result
@@ -1511,18 +1116,44 @@
                                  read-block-comment)
                        ignore-whitespace)))
 
-(def read-main
-  (grmr/rule "main"
-             (apply-to ast/annotated
+(def read-single-arity
+  (grmr/rule "single-arity"
+             (apply-to (fn [params doc body]
+                         (ast/fn-arity params doc body))
+                       read-list-destructure
+                       read-fn-doc
+                       (grmr/any read-inline-body
+                                 (grmr/one-or-more read-sub-expr)
+                                 (grmr/error "Body of function is wrong."))
+                       ignore-whitespace)))
+
+(def read-arities
+  (grmr/rule "arities"
+             (grmr/any (apply-to vector read-single-arity)
+                       (apply-to (fn [doc arities]
+                                   (map arities (fn [arity]
+                                                  (.doc arity doc))))
+                                 read-fn-doc
+                                 (grmr/one-or-more (apply-to identity
+                                                             read-open-paren
+                                                             read-single-arity
+                                                             read-close-paren))))))
+(def read-defn
+  (grmr/rule "defn"
+             (apply-to identity
                        read-open-paren
-                       (grmr/ignore "main")
-                       (grmr/any (apply-to ast/main-fn
-                                           read-list-destructure
-                                           (grmr/any read-inline-body
-                                                     (grmr/one-or-more read-expr)
-                                                     (grmr/error "Body of 'main' fn is wrong."))
+                       (grmr/ignore "defn")
+                       (grmr/ignore (grmr/one-or-more whitespace))
+                       (grmr/any (apply-to (fn [name arities]
+                                             (ast/definition name
+                                               (list (ast/fn-expr name arities))))
+                                           (grmr/any read-symbol
+                                                     (grmr/error "'defn' must be followed by"
+                                                                 "the name of the function."))
+                                           (grmr/ignore (grmr/one-or-more whitespace))
+                                           read-arities
                                            read-close-paren)
-                                 (grmr/error "'main' fn expression is wrong.")))))
+                                 (grmr/error "Invalid 'defn' expression.")))))
 
 (def read-def
   (grmr/rule "def"
@@ -1551,397 +1182,10 @@
                                            read-close-paren)
                                  (grmr/error "Invalid 'def' expression.")))))
 
-(def read-prototype
-  (grmr/rule "prototype"
-             (grmr/any read-assert
-                       (apply-to identity
-                                 read-open-paren
-                                 (grmr/any
-                                  (apply-to ast/prototype
-                                            (grmr/any read-symbol
-                                                      (grmr/error "Every prototype function must"
-                                                                  "have a unique name."))
-                                            read-list-destructure
-                                            read-fn-doc
-                                            (grmr/any read-inline-body
-                                                      (grmr/none-or-more read-expr))
-                                            read-close-paren)
-                                  (grmr/error "Invalid prototype function."))))))
-
-(def read-defprotocol
-  (grmr/rule "defprotocol"
-             (apply-to identity
-                       read-open-paren
-                       (grmr/ignore "defprotocol")
-                       (grmr/ignore (grmr/one-or-more whitespace))
-                       (grmr/any (apply-to
-                                  (fn [sym prototypes]
-                                    (ast/protocol
-                                     sym (remove prototypes (partial instance? ast/NoCode))))
-                                  (grmr/any read-symbol
-                                            (grmr/error "'defprotocol' must be followed by"
-                                                        "the name of the protocol."))
-                                  ;; TODO: much too complex. should be
-                                  ;; (grmr/none-or-more read-prototype)
-                                  ;; but this gives better error messages
-                                  (apply-to (fn [comms protos]
-                                              (comp* comms (seq protos)))
-                                            (grmr/none-or-more read-block-comment)
-                                            (grmr/all (grmr/any (grmr/one-or-more read-prototype)
-                                                                (grmr/error "A protocol definition must"
-                                                                            "contain at least one prototype"
-                                                                            "function defintion."))
-                                                      (grmr/none-or-more
-                                                       (grmr/any read-prototype
-                                                                 read-block-comment))))
-                                  read-close-paren)
-                                 (grmr/error "Invalid 'defprotocol' expression.")))))
-
-(def read-defn
-  (grmr/rule "defn"
-             (apply-to identity
-                       read-open-paren
-                       (grmr/ignore "defn")
-                       (grmr/ignore (grmr/one-or-more whitespace))
-                       (grmr/any (apply-to (fn [name arities]
-                                             (ast/definition name
-                                               (list (ast/fn-expr name arities))))
-                                           (grmr/any read-symbol
-                                                     (grmr/error "'defn' must be followed by"
-                                                                 "the name of the function."))
-                                           (grmr/ignore (grmr/one-or-more whitespace))
-                                           read-arities
-                                           read-close-paren)
-                                 (grmr/error "Invalid 'defn' expression.")))))
-
-(def read-extend-type
-  (grmr/rule "extend-type"
-             (apply-to identity
-                       read-open-paren
-                       (grmr/ignore "extend-type")
-                       (grmr/any (apply-to ast/type-extension
-                                           (grmr/ignore
-                                            (grmr/one-or-more whitespace))
-                                           (grmr/any read-symbol
-                                                     (grmr/error "'extend-type' must be followed by a"
-                                                                 "type name."))
-                                           (grmr/one-or-more read-proto-impls)
-                                           read-close-paren)
-                                 (grmr/error "Invalid 'extend-type' expression.")))))
-
-(def read-deftype
-  (grmr/rule "deftype"
-             (apply-to identity
-                       read-open-paren
-                       (grmr/ignore "deftype")
-                       (grmr/any (apply-to ast/type-expr
-                                           (grmr/ignore
-                                            (grmr/one-or-more whitespace))
-                                           (grmr/any read-symbol
-                                                     (grmr/error "'deftype' must be followed by a"
-                                                                 "type name."))
-                                           (grmr/any read-list-destructure
-                                                     (grmr/error "Fields (if any) for a new type must be"
-                                                                 "enclosed by square brackets [ ]."))
-
-                                           (grmr/none-or-more read-proto-impls)
-                                           read-close-paren)
-                                 (grmr/error "Invalid 'deftype' expression.")))))
-
-(def read-JS-callable
-  (grmr/rule "JS-callable"
-             (apply-to identity
-                       read-open-paren
-                       (grmr/ignore "JS-callable")
-                       (grmr/any (apply-to (fn [sym num-args]
-                                             (ast/JS-callable sym num-args))
-                                           (grmr/ignore
-                                            (grmr/one-or-more whitespace))
-                                           read-symbol
-                                           (grmr/ignore
-                                            (grmr/one-or-more whitespace))
-                                           read-integer
-                                           read-close-paren)
-                                 (grmr/error "invalid 'JS-callable' expression.")))))
-
-(defn kw-string-arg [kw-sym]
-  (apply-to (fn [kw-sym value]
-              [(symbol kw-sym) value])
-            (grmr/ignore
-             (grmr/one-or-more whitespace))
-            (grmr/ignore ":")
-            (grmr/string-terminal kw-sym)
-            (grmr/ignore
-             (grmr/one-or-more whitespace))
-            read-string))
-
-(def read-git-kwargs
-  (grmr/rule "git-kwargs"
-             (apply-to (fn [kv-pairs]
-                         (reduce kv-pairs {} (fn [m [k v]]
-                                               (assoc m k v))))
-                       (grmr/none-or-more
-                        (grmr/any (kw-string-arg "tag")
-                                  (kw-string-arg "sha")
-                                  (kw-string-arg "branch")
-                                  ;; TODO: this error doesn't get triggered by
-                                  ;; :sh "blahblah"
-                                  (grmr/all ":" (grmr/error "Invalid Git commit specifier.")))))))
-
-(def read-git-dep-spec
-  (grmr/rule "git-dep"
-             (apply-to identity
-                       read-open-paren
-                       (grmr/ignore "git-dependency")
-                       (grmr/any (apply-to ast/git-dep
-                                           (grmr/ignore
-                                            (grmr/one-or-more whitespace))
-                                           (grmr/any read-string
-                                                     (grmr/error (str "Git repository URL must"
-                                                                      " be string literal.")))
-                                           (grmr/ignore
-                                            (grmr/one-or-more whitespace))
-                                           (grmr/any read-string
-                                                     (grmr/error (str "File name in Git repository must"
-                                                                      " be string literal.")))
-                                           read-git-kwargs
-                                           read-close-paren)
-                                 (grmr/error "Invalid 'git-dependency' expression")))))
-
-(def read-module-spec
-  (grmr/rule "module"
-             (apply-to identity
-                       read-open-paren
-                       (grmr/ignore "module")
-                       (grmr/any (apply-to ast/module
-                                           (grmr/ignore
-                                            (grmr/one-or-more whitespace))
-                                           (grmr/any read-string
-                                                     (grmr/error (str "Module file name must"
-                                                                      " be string literal.")))
-                                           read-close-paren)
-                                 (grmr/error "Invalid 'module' expression")))))
-
-(def read-add-ns
-  (grmr/rule
-   "add-ns"
-   (apply-to identity
-             ignore-whitespace
-             ;; (grmr/catch-error
-             ;;  output-error)
-             (apply-to identity
-                       read-open-paren
-                       (grmr/ignore "add-ns")
-                       (grmr/any (apply-to ast/ns-add
-                                           (grmr/ignore
-                                            (grmr/one-or-more whitespace))
-                                           (grmr/any read-symbol
-                                                     (grmr/error "Missing or invalid namespace symbol"))
-                                           (grmr/any read-module-spec
-                                                     read-git-dep-spec
-                                                     (grmr/error "Missing or invalid namespace"
-                                                                 "specification"))
-                                           read-close-paren)
-                                 (grmr/error "Invalid 'add-ns' expression"))))))
-
 (def bad-expr
   (grmr/rule "bad-expr"
              (grmr/all ignore-whitespace "("
                        (grmr/error "Invalid expression"))))
-
-(def shebang (apply-to (fn [file]
-                         ;; just a dummy ast that does nothing
-                         (ast/inline-ast (ast/tag 'C) c/top-type "" file 0))
-                       (grmr/get-value 'file-name)
-                       (grmr/ignore (grmr/all "#!"
-                                              (grmr/none-or-more not-eol)
-                                              newline))))
-
-;; TODO: for regression testing type checker
-(def read-sub-exp-type
-  (grmr/recurse "expected-type"))
-
-(def type-literals {"empty-list" empty-list
-                    "c/empty-list-constraint" c/empty-list-constraint
-                    "c/empty-vect-constraint" c/empty-vect-constraint
-                    "c/list-constraint" c/list-constraint
-                    "c/vect-constraint" c/vect-constraint
-                    "c/seq-constraint" c/seq-constraint
-                    "c/no-symbol" c/no-symbol
-                    "c/no-tail" c/no-tail
-                    "c/no-int" c/no-int
-                    "c/no-string" c/no-string
-                    "c/no-fields" c/no-fields
-                    "c/no-args" c/no-args
-                    "c/variadic" c/variadic
-                    "c/top-type" c/top-type
-                    "c/bottom-type" c/bottom-type
-                    "c/fn-constraint" c/fn-constraint
-                    "c/arity-constraint" c/arity-constraint
-                    "c/int-constraint" c/int-constraint
-                    "c/maybe-constraint" c/maybe-constraint
-                    "c/hashmap-constraint" c/hashmap-constraint
-                    "c/bitmap-constraint" c/bitmap-constraint
-                    "c/array-constraint" c/array-constraint
-                    "c/hash-coll-constraint" c/hash-coll-constraint
-                    "c/promise-constraint" c/promise-constraint
-                    "c/future-constraint" c/future-constraint
-                    "c/inner-type-of" c/inner-type-of
-                    "c/inner-type-of-op" c/inner-type-of-op
-                    "c/result-of" c/result-of
-                    "c/string-constraint" c/string-constraint
-                    "c/strbuff-constraint" c/strbuff-constraint
-                    "c/substr-constraint" c/substr-constraint
-                    "c/empty-fn-constraint" c/empty-fn-constraint
-                    "c/list-from-op" c/list-from-op
-                    "c/vect-from-op" c/vect-from-op
-                    "c/arg-of-op" c/arg-of-op
-                    "c/call-value-op" c/call-value-op
-                    "c/concat-op" c/concat-op
-                    "c/apply-op" c/apply-op
-                    "c/first-of-op" c/first-of-op
-                    "c/last-of-op" c/last-of-op
-                    "c/rest-of-op" c/rest-of-op
-                    "c/butlast-of-op" c/butlast-of-op
-                    ;; "c/get-from-op" c/get-from-op
-                    ;; "c/set-to-op" c/set-to-op
-                    })
-
-(def read-type-literal
-  (grmr/rule "type-literal"
-             (apply-to (fn [lit-name]
-                         (either (get type-literals lit-name)
-                                 (do
-                                   (print-err "No type literal named" (str "'" lit-name "'")
-                                              "exists.")
-                                   (abort))))
-                       ignore-whitespace
-                       (apply grmr/any (keys type-literals)))))
-
-(def type-constraints {"c/AllValues" c/AllValues
-                       "c/NoValues" c/NoValues
-                       "c/FnConstraint" c/FnConstraint
-                       "c/fn-c " c/fn-c
-                       "c/fn-arity" c/fn-arity
-                       "c/ListConstraint" c/ListConstraint
-                       "c/list-c " c/list-c
-                       "c/param " c/param
-                       "c/ParamConstraint" c/ParamConstraint
-                       "c/MaybeConstraint" c/MaybeConstraint
-                       "c/IntegerConstraint" c/IntegerConstraint
-                       "c/TypeOfConstraint" c/TypeOfConstraint
-                       "c/SymbolConstraint" c/SymbolConstraint
-                       "c/StrBuffConstraint" c/StrBuffConstraint
-                       "c/SubStrConstraint" c/SubStrConstraint
-                       "c/hashmap-c " c/hashmap-c
-                       "c/VectorConstraint" c/VectorConstraint
-                       "c/vect-c " c/vect-c
-                       "c/AgentConstraint" c/AgentConstraint
-                       "c/FutureConstraint" c/FutureConstraint
-                       "c/OpaqueConstraint" c/OpaqueConstraint
-                       "c/PromiseConstraint" c/PromiseConstraint
-                       "c/ReifiedConstraint" c/ReifiedConstraint
-                       "c/SumConstraint" c/SumConstraint
-                       "c/ProtoImpls" c/ProtoImpls
-                       "c/sum-c" c/sum-c
-                       "c/multi" c/multi
-                       "c/CollectionOf" c/CollectionOf
-                       "c/coll-of-c" c/coll-of-c
-                       "c/TypeOp" c/TypeOp
-                       "c/type-op" c/type-op
-                       "c/fn-arity" c/fn-arity
-                       "c/intersect" c/intersect
-                       "c/reify-type-constraint" c/reify-type-constraint
-                       ".required-arities" .required-arities
-                       "c/Location" c/Location
-                       "symbol" symbol
-                       "c/do-call-value" c/do-call-value
-                       "c/trim" c/trim
-                       "=" =
-                       })
-
-(def read-type-constraint
-  (grmr/rule "type-constraint"
-             (apply-to (fn [constraint-name args]
-                         (either (map (get type-constraints constraint-name)
-                                      (fn [f]
-                                        (apply f args)))
-                                 (do
-                                   (print-err "No constraint named" (str "'" constraint-name "'")
-                                              "exists.")
-                                   (abort))))
-                       read-open-paren
-                       ignore-whitespace
-                       (apply grmr/any (keys type-constraints))
-                       (grmr/one-or-more (apply-to identity
-                                                   ignore-whitespace
-                                                   (grmr/any read-sub-exp-type
-                                                             (apply-to (fn [q-ast]
-                                                                         (ast/untag (.q-val q-ast)))
-                                                                       read-quoted)
-                                                             read-string
-                                                             read-integer)))
-                       read-close-paren)))
-
-(def read-arity-map
-  (grmr/rule "arity-map"
-             (apply-to identity
-                       (grmr/ignore "{")
-                       (apply-to (fn [elems]
-                                   (reduce elems {} (fn [m [k v]]
-                                                      (assoc m k v))))
-                                 (grmr/none-or-more (grmr/all ignore-whitespace
-                                                              (grmr/any read-integer
-                                                                        (apply-to (fn [q-ast]
-                                                                                    (ast/untag (.q-val q-ast)))
-                                                                                  read-quoted)
-                                                                        read-type-literal)
-                                                              (grmr/any read-integer
-                                                                        (apply-to (fn [q-ast]
-                                                                                    (ast/untag (.q-val q-ast)))
-                                                                                  read-quoted)
-                                                                        read-type-literal
-                                                                        read-type-constraint)))
-                                 ignore-whitespace
-                                 (grmr/any (grmr/ignore "}")
-                                           (grmr/error "Missing \"}\"."))))))
-
-(def read-expected-type
-  (grmr/rule read-sub-exp-type
-             (grmr/any read-type-literal
-                       read-integer
-                       read-string
-                       read-arity-map
-                       (apply-to identity
-                                 (grmr/ignore "[")
-                                 (grmr/none-or-more read-sub-exp-type)
-                                 read-close-bracket)
-                       (apply-to (fn [q-ast]
-                                   (ast/untag (.q-val q-ast)))
-                                 read-quoted)
-                       read-type-constraint)))
-
-(def read-is-type
-  (grmr/rule "is-type"
-             (apply-to (fn [file line type-expr expr]
-                         (ast/IsType type-expr expr))
-                       read-open-paren
-                       ignore-whitespace
-                       (grmr/ignore "is-type")
-                       (grmr/get-value 'file-name)
-                       (grmr/get-value 'line-number)
-                       ignore-whitespace
-                       (grmr/any (apply-to (fn [proto-sym type-sym]
-                                             (ast/GetImpl proto-sym type-sym c/top-type))
-                                           (grmr/ignore "(#impl")
-                                           ignore-whitespace
-                                           read-symbol
-                                           ignore-whitespace
-                                           (grmr/optional read-symbol c/no-symbol)
-                                           read-close-paren)
-                                 read-expr)
-                       read-expected-type
-                       read-close-paren)))
 
 (def top-level
   (grmr/rule "top-level"
@@ -1951,17 +1195,17 @@
                        ;;  output-error)
                        (grmr/any read-defn
                                  read-def
-                                 read-defprotocol
-                                 read-deftype
-                                 read-extend-type
-                                 read-block-comment
-                                 read-main
-                                 read-JS-callable
-                                 read-inline
-                                 read-add-ns
-                                 read-show-type
-                                 read-is-type
-                                 shebang
+                                 ;; read-defprotocol
+                                 ;; read-deftype
+                                 ;; read-extend-type
+                                 ;; read-block-comment
+                                 ;; read-main
+                                 ;; read-JS-callable
+                                 ;; read-inline
+                                 ;; read-add-ns
+                                 ;; read-show-type
+                                 ;; read-is-type
+                                 ;; shebang
                                  bad-expr
                                  ;; TODO: detect end of input
                                  ))))
