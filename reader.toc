@@ -11,7 +11,7 @@
 ;; The different types of nodes in the AST
 (add-ns ast (git-dependency "https://github.com/Toccata-Lang/ast.git"
                             "ast.toc"
-                            :sha "c400d2e"))
+                            :sha "f37de03"))
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
@@ -424,7 +424,7 @@
   (grmr/rule "type-of"
              (apply-to (fn [file line sym]
                          (-> c/type-of-constraint
-                             (.param-sym (ast/untag sym))
+                             (.param-sym sym)
                              (c/update-path (c/Location file line))))
                        read-open-paren
                        ignore-whitespace
@@ -1084,38 +1084,6 @@
                                  (grmr/error "Invalid '->' expression."))
                        read-close-paren)))
 
-(def read-expr
-  (grmr/rule read-sub-expr
-             (apply-to identity
-                       ignore-whitespace
-                       (grmr/any read-integer-literal
-                                 read-string-literal
-                                 curr-file-name
-                                 curr-line
-                                 read-symbol
-                                 read-quoted
-                                 ;; read-or
-                                 ;; read-and
-                                 ;; read-either
-                                 ;; read-cond
-                                 ;; read-fn
-                                 ;; read-let
-                                 ;; read-do
-                                 ;; read-apply-to
-                                 read-reify
-                                 read-vector
-                                 read-hash-map
-                                 read-hash-set
-                                 ;; read-for
-                                 read-threading
-                                 read-assert
-                                 read-assert-result
-                                 (grmr/all read-inline
-                                           (grmr/error "'inline' expressions not allowed here."))
-                                 read-call
-                                 read-block-comment)
-                       ignore-whitespace)))
-
 (def read-single-arity
   (grmr/rule "single-arity"
              (apply-to (fn [params doc body]
@@ -1138,6 +1106,52 @@
                                                              read-open-paren
                                                              read-single-arity
                                                              read-close-paren))))))
+
+(def read-fn
+  (grmr/rule "fn"
+             (apply-to identity
+                       read-open-paren
+                       (grmr/ignore "fn")
+                       (grmr/ignore (grmr/one-or-more whitespace))
+                       (grmr/any (apply-to (fn [name arities]
+                                             (ast/fn-expr name arities))
+                                           (grmr/optional read-symbol c/no-symbol)
+                                           ignore-whitespace
+                                           read-arities
+                                           read-close-paren)
+                                 (grmr/error "Invalid 'fn' expression.")))))
+
+(def read-expr
+  (grmr/rule read-sub-expr
+             (apply-to identity
+                       ignore-whitespace
+                       (grmr/any read-integer-literal
+                                 read-string-literal
+                                 curr-file-name
+                                 curr-line
+                                 read-symbol
+                                 read-quoted
+                                 ;; read-or
+                                 ;; read-and
+                                 ;; read-either
+                                 ;; read-cond
+                                 read-fn
+                                 ;; read-let
+                                 ;; read-do
+                                 ;; read-apply-to
+                                 read-reify
+                                 read-vector
+                                 read-hash-map
+                                 read-hash-set
+                                 ;; read-for
+                                 read-threading
+                                 read-assert
+                                 read-assert-result
+                                 (grmr/all read-inline
+                                           (grmr/error "'inline' expressions not allowed here."))
+                                 read-call
+                                 read-block-comment)
+                       ignore-whitespace)))
 
 (def read-prototype
   (grmr/rule "prototype"
@@ -1223,6 +1237,21 @@
                                            read-close-paren)
                                  (grmr/error "Invalid 'def' expression.")))))
 
+(def read-extend-type
+  (grmr/rule "extend-type"
+             (apply-to identity
+                       read-open-paren
+                       (grmr/ignore "extend-type")
+                       (grmr/any (apply-to ast/type-extension
+                                           (grmr/ignore
+                                            (grmr/one-or-more whitespace))
+                                           (grmr/any read-symbol
+                                                     (grmr/error "'extend-type' must be followed by a"
+                                                                 "type name."))
+                                           (grmr/one-or-more read-proto-impls)
+                                           read-close-paren)
+                                 (grmr/error "Invalid 'extend-type' expression.")))))
+
 (def read-deftype
   (grmr/rule "deftype"
              (apply-to identity
@@ -1272,7 +1301,7 @@
                                  read-def
                                  read-defprotocol
                                  read-deftype
-                                 ;; read-extend-type
+                                 read-extend-type
                                  ;; read-block-comment
                                  ;; read-main
                                  ;; read-JS-callable
