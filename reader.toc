@@ -11,7 +11,7 @@
 ;; The different types of nodes in the AST
 (add-ns ast (git-dependency "https://github.com/Toccata-Lang/ast.git"
                             "ast.toc"
-                            :sha "0f3a1ff"))
+                            :sha "f613e93"))
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
@@ -1163,6 +1163,23 @@
                                  (grmr/error "An 'and' expression must contain at least one clause."))
                        read-close-paren)))
 
+(def read-cond-val
+  (grmr/rule "cond-value"
+             (apply-to ast/cond-val-expr
+                       read-sub-expr
+                       read-sub-expr)))
+
+(def read-cond
+  (grmr/rule "cond"
+             (apply-to ast/cond-expr
+                       read-open-paren
+                       (grmr/ignore "cond")
+                       (grmr/ignore (grmr/one-or-more whitespace))
+                       (grmr/one-or-more read-cond-val)
+                       (grmr/any read-sub-expr
+                                 (grmr/error "Missing 'cond' default clause."))
+                       read-close-paren)))
+
 (def read-expr
   (grmr/rule read-sub-expr
              (apply-to identity
@@ -1176,7 +1193,7 @@
                                  ;; read-or
                                  read-and
                                  read-either
-                                 ;; read-cond
+                                 read-cond
                                  read-fn
                                  read-let
                                  ;; read-do
