@@ -11,7 +11,7 @@
 ;; The different types of nodes in the AST
 (add-ns ast (git-dependency "https://github.com/Toccata-Lang/ast.git"
                             "ast.toc"
-                            :sha "f37de03"))
+                            :sha "2bd7ad4"))
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
@@ -1051,6 +1051,17 @@
                        (grmr/ignore "'")
                        read-quoted-value)))
 
+(def read-either
+  (grmr/rule "either"
+             (apply-to ast/either-expr
+                       read-open-paren
+                       (grmr/ignore "either")
+                       (grmr/ignore (grmr/one-or-more whitespace))
+                       read-sub-expr
+                       (grmr/any read-sub-expr
+                                 (grmr/error "Missing 'either' clause."))
+                       read-close-paren)))
+
 (defn nest-thread-exprs [first-expr exprs]
   (let [[first-expr & exprs] (remove (cons first-expr (seq exprs))
                                      (partial instance? ast/NoCode))]
@@ -1121,6 +1132,37 @@
                                            read-close-paren)
                                  (grmr/error "Invalid 'fn' expression.")))))
 
+(def read-let-binding
+  (grmr/rule "let-binding"
+             (apply-to ast/binding
+                       ignore-whitespace
+                       read-destructure
+                       read-sub-expr)))
+
+(def read-let
+  (grmr/rule "let"
+             (apply-to identity
+                       read-open-paren
+                       (grmr/ignore "let")
+                       ignore-whitespace
+                       (grmr/ignore "[")
+                       (grmr/any (apply-to ast/let-expr
+                                           (grmr/one-or-more read-let-binding)
+                                           read-close-bracket
+                                           (grmr/one-or-more read-sub-expr)
+                                           read-close-paren)
+                                 (grmr/error "Invalid 'let' expression")))))
+
+(def read-and
+  (grmr/rule "and"
+             (apply-to ast/and-expr
+                       read-open-paren
+                       (grmr/ignore "and")
+                       (grmr/ignore (grmr/one-or-more whitespace))
+                       (grmr/any (grmr/one-or-more read-sub-expr)
+                                 (grmr/error "An 'and' expression must contain at least one clause."))
+                       read-close-paren)))
+
 (def read-expr
   (grmr/rule read-sub-expr
              (apply-to identity
@@ -1132,11 +1174,11 @@
                                  read-symbol
                                  read-quoted
                                  ;; read-or
-                                 ;; read-and
-                                 ;; read-either
+                                 read-and
+                                 read-either
                                  ;; read-cond
                                  read-fn
-                                 ;; read-let
+                                 read-let
                                  ;; read-do
                                  ;; read-apply-to
                                  read-reify
