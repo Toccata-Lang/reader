@@ -11,7 +11,7 @@
 ;; The different types of nodes in the AST
 (add-ns ast (git-dependency "https://github.com/Toccata-Lang/ast.git"
                             "ast.toc"
-                            :sha "f613e93"))
+                            :sha "160df7a"))
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
@@ -1153,6 +1153,16 @@
                                            read-close-paren)
                                  (grmr/error "Invalid 'let' expression")))))
 
+(def read-or
+  (grmr/rule "or"
+             (apply-to ast/or-expr
+                       read-open-paren
+                       (grmr/ignore "or")
+                       (grmr/ignore (grmr/one-or-more whitespace))
+                       (grmr/any (grmr/one-or-more read-sub-expr)
+                                 (grmr/error "An 'or' expression must contain at least one clause."))
+                       read-close-paren)))
+
 (def read-and
   (grmr/rule "and"
              (apply-to ast/and-expr
@@ -1190,7 +1200,7 @@
                                  curr-line
                                  read-symbol
                                  read-quoted
-                                 ;; read-or
+                                 read-or
                                  read-and
                                  read-either
                                  read-cond
