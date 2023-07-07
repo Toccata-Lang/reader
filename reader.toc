@@ -11,11 +11,11 @@
 ;; The different types of nodes in the AST
 (add-ns ast (git-dependency "https://github.com/Toccata-Lang/ast.git"
                             "ast.toc"
-                            :sha "168fb4d"))
+                            :sha "2ed6c2c"))
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
-                          :sha "b554de9"))
+                          :sha "68e9de4"))
 (defn min [x y]
   (either (< x y)
           y))
@@ -1190,6 +1190,127 @@
                                  (grmr/error "Missing 'cond' default clause."))
                        read-close-paren)))
 
+(def wrapper-sym (ast/tag "#wrapper"))
+
+(def read-for-when
+  (grmr/rule "for-when"
+             (apply-to (fn [fn ln clause]
+                         (ast/cond-ast clause (ast/block-comment fn ln [])
+                                       (ast/call-ast (ast/tag 'zero (c/Location fn ln))
+                                                     [wrapper-sym] c/top-type)
+                                       c/top-type))
+                       (grmr/get-value 'file-name)
+                       (grmr/get-value 'line-number)
+                       ignore-whitespace
+                       (grmr/ignore ":when")
+                       (grmr/ignore (grmr/one-or-more whitespace))
+                       read-sub-expr)))
+
+(def read-for-when-not
+  (grmr/rule "for-when-not"
+             (apply-to (fn [fn ln clause]
+                         (ast/cond-ast clause (ast/call-ast (ast/tag 'zero (c/Location fn ln))
+                                                            [wrapper-sym] c/top-type)
+                                       (ast/block-comment fn ln [])
+                                       c/top-type))
+                       (grmr/get-value 'file-name)
+                       (grmr/get-value 'line-number)
+                       ignore-whitespace
+                       (grmr/ignore ":when-not")
+                       (grmr/ignore (grmr/one-or-more whitespace))
+                       read-sub-expr)))
+
+(def read-for-let
+  (grmr/rule "for-let"
+             (apply-to identity
+                       ignore-whitespace
+                       (grmr/ignore ":let")
+                       (grmr/ignore (grmr/one-or-more whitespace))
+                       read-open-bracket
+                       (grmr/one-or-more read-let-binding)
+                       read-close-bracket
+                       ignore-whitespace)))
+
+(def read-for-binding
+  (grmr/rule "for-binding"
+             (grmr/any read-for-let
+                       read-for-when
+                       read-for-when-not
+                       read-let-binding
+                       (apply-to identity
+                                 read-block-comment
+                                 ignore-whitespace))))
+
+(defn nest-for-exprs [fst rst body]
+  (assert (instance? ast/binding-ast fst))
+  (assert (instance? (vector-of (any-of ast/binding-ast
+                                        ast/cond-ast
+                                        Vector))
+                     rst))
+  (let [cont (-> (reverse rst)
+                 (reduce body (fn [cont expr]
+                                (cond (instance? Vector expr)
+                                      (ast/cond-expr expr cont)
+
+                                      (instance? ast/binding-ast expr)
+                                      (ast/call-ast (ast/tag 'flat-map (ast/location expr))
+                                                    [(.val expr)
+                                                     (ast/fn-expr c/no-symbol
+                                                                  [(ast/fn-arity
+                                                                    (ast/params [(.binding expr)])
+                                                                    "" [cont])])]
+                                                    c/top-type)
+
+                                      (instance? ast/cond-ast expr)
+                                      (cond (instance? ast/block-comment-ast (.value expr))
+                                            (.value expr cont)
+                                            (.cont expr cont))
+
+                                      (do
+                                        (print-err "Parser error" _FILE_ _LINE_)
+                                        (abort))))))
+        wrapper (ast/tag (gensym "wrap") (ast/location fst))]
+    (ast/binding-ast wrapper (.val fst)
+                     (ast/call-ast (ast/tag 'flat-map (ast/location fst))
+                                   [wrapper
+                                    (ast/fn-expr c/no-symbol
+                                                 [(ast/fn-arity
+                                                   (ast/params [(.binding fst)])
+                                                   ""
+                                                   [(cata (fn [x]
+                                                            (cond (= x wrapper-sym)
+                                                                  wrapper
+                                                                  x))
+                                                          cont)])])]
+                                   c/top-type)
+                     c/top-type)))
+
+(def read-for
+  (grmr/rule "for"
+             (apply-to identity
+                       read-open-paren
+                       (grmr/ignore "for")
+                       (grmr/ignore (grmr/one-or-more whitespace))
+                       (grmr/any (apply-to nest-for-exprs
+                                           read-open-bracket
+                                           (grmr/any read-let-binding
+                                                     (grmr/error "Invalid initial 'for' binding."))
+                                           (grmr/any (grmr/none-or-more read-for-binding)
+                                                     (grmr/error "Invalid 'for' bindings."))
+                                           read-close-bracket
+                                           (grmr/any (grmr/any read-sub-expr
+                                                               (grmr/error "The body of a 'for' expression"
+                                                                           " must have a single"
+                                                                           " expression in it."))
+                                                     (grmr/error "Invalid 'for' body.")))
+                                 (grmr/error "Invalid 'for' expression."))
+                       (grmr/any (grmr/ignore
+                                  (grmr/all read-sub-expr
+                                            (grmr/error "The body of a 'for'"
+                                                        "expression may only have"
+                                                        "one expression in it.")))
+                                 read-close-paren))))
+
 (def read-expr
   (grmr/rule read-sub-expr
              (apply-to identity
@@ -1212,7 +1333,7 @@
                                  read-vector
                                  read-hash-map
                                  read-hash-set
-                                 ;; read-for
+                                 read-for
                                  read-threading
                                  read-assert
                                  read-assert-result
@@ -1360,6 +1481,206 @@
              (grmr/all ignore-whitespace "("
                        (grmr/error "Invalid expression"))))
 
+;; TODO: for regression testing type checker
+(def read-sub-exp-type
+  (grmr/recurse "expected-type"))
+
+(def type-literals {"empty-list" empty-list
+                    "c/empty-list-constraint" c/empty-list-constraint
+                    "c/empty-vect-constraint" c/empty-vect-constraint
+                    "c/list-constraint" c/list-constraint
+                    "c/vect-constraint" c/vect-constraint
+                    "c/seq-constraint" c/seq-constraint
+                    "c/no-symbol" c/no-symbol
+                    "c/no-tail" c/no-tail
+                    "c/no-int" c/no-int
+                    "c/no-string" c/no-string
+                    "c/no-fields" c/no-fields
+                    "c/no-args" c/no-args
+                    "c/variadic" c/variadic
+                    "c/top-type" c/top-type
+                    "c/bottom-type" c/bottom-type
+                    "c/fn-constraint" c/fn-constraint
+                    "c/arity-constraint" c/arity-constraint
+                    "c/int-constraint" c/int-constraint
+                    "c/maybe-constraint" c/maybe-constraint
+                    "c/hashmap-constraint" c/hashmap-constraint
+                    "c/bitmap-constraint" c/bitmap-constraint
+                    "c/array-constraint" c/array-constraint
+                    "c/hash-coll-constraint" c/hash-coll-constraint
+                    "c/promise-constraint" c/promise-constraint
+                    "c/future-constraint" c/future-constraint
+                    "c/inner-type-of" c/inner-type-of
+                    "c/inner-type-of-op" c/inner-type-of-op
+                    "c/result-of" c/result-of
+                    "c/string-constraint" c/string-constraint
+                    "c/strbuff-constraint" c/strbuff-constraint
+                    "c/substr-constraint" c/substr-constraint
+                    "c/empty-fn-constraint" c/empty-fn-constraint
+                    "c/list-from-op" c/list-from-op
+                    "c/vect-from-op" c/vect-from-op
+                    "c/arg-of-op" c/arg-of-op
+                    "c/call-value-op" c/call-value-op
+                    "c/concat-op" c/concat-op
+                    "c/apply-op" c/apply-op
+                    "c/first-of-op" c/first-of-op
+                    "c/last-of-op" c/last-of-op
+                    "c/rest-of-op" c/rest-of-op
+                    "c/butlast-of-op" c/butlast-of-op
+                    ;; "c/get-from-op" c/get-from-op
+                    ;; "c/set-to-op" c/set-to-op
+                    })
+
+(def read-type-literal
+  (grmr/rule "type-literal"
+             (apply-to (fn [lit-name]
+                         (either (get type-literals lit-name)
+                                 (do
+                                   (print-err "No type literal named" (str "'" lit-name "'")
+                                              "exists.")
+                                   (abort))))
+                       ignore-whitespace
+                       (apply grmr/any (keys type-literals)))))
+
+(def type-constraints {"c/AllValues" c/AllValues
+                       "c/NoValues" c/NoValues
+                       "c/FnConstraint" c/FnConstraint
+                       "c/fn-c " c/fn-c
+                       "c/fn-arity" c/fn-arity
+                       "c/ListConstraint" c/ListConstraint
+                       "c/list-c " c/list-c
+                       "c/param " c/param
+                       "c/ParamConstraint" c/ParamConstraint
+                       "c/MaybeConstraint" c/MaybeConstraint
+                       "c/IntegerConstraint" c/IntegerConstraint
+                       "c/TypeOfConstraint" c/TypeOfConstraint
+                       "c/SymbolConstraint" c/SymbolConstraint
+                       "c/StrBuffConstraint" c/StrBuffConstraint
+                       "c/SubStrConstraint" c/SubStrConstraint
+                       "c/hashmap-c " c/hashmap-c
+                       "c/VectorConstraint" c/VectorConstraint
+                       "c/vect-c " c/vect-c
+                       "c/AgentConstraint" c/AgentConstraint
+                       "c/FutureConstraint" c/FutureConstraint
+                       "c/OpaqueConstraint" c/OpaqueConstraint
+                       "c/PromiseConstraint" c/PromiseConstraint
+                       "c/ReifiedConstraint" c/ReifiedConstraint
+                       "c/SumConstraint" c/SumConstraint
+                       "c/ProtoImpls" c/ProtoImpls
+                       "c/sum-c" c/sum-c
+                       "c/multi" c/multi
+                       "c/CollectionOf" c/CollectionOf
+                       "c/coll-of-c" c/coll-of-c
+                       "c/TypeOp" c/TypeOp
+                       "c/type-op" c/type-op
+                       "c/fn-arity" c/fn-arity
+                       "c/intersect" c/intersect
+                       "c/reify-type-constraint" c/reify-type-constraint
+                       ".required-arities" .required-arities
+                       "c/Location" c/Location
+                       "symbol" symbol
+                       "c/do-call-value" c/do-call-value
+                       "c/trim" c/trim
+                       "=" =
+                       })
+
+(def read-type-constraint
+  (grmr/rule "type-constraint"
+             (apply-to (fn [constraint-name args]
+                         (either (map (get type-constraints constraint-name)
+                                      (fn [f]
+                                        (apply f args)))
+                                 (do
+                                   (print-err "No constraint named" (str "'" constraint-name "'")
+                                              "exists.")
+                                   (abort))))
+                       read-open-paren
+                       ignore-whitespace
+                       (apply grmr/any (keys type-constraints))
+                       (grmr/one-or-more (apply-to identity
+                                                   ignore-whitespace
+                                                   (grmr/any read-sub-exp-type
+                                                             (apply-to (fn [q-ast]
+                                                                         (ast/untag (.q-val q-ast)))
+                                                                       read-quoted)
+                                                             read-string
+                                                             read-integer)))
+                       read-close-paren)))
+
+(def read-arity-map
+  (grmr/rule "arity-map"
+             (apply-to identity
+                       (grmr/ignore "{")
+                       (apply-to (fn [elems]
+                                   (reduce elems {} (fn [m [k v]]
+                                                      (assoc m k v))))
+                                 (grmr/none-or-more (grmr/all ignore-whitespace
+                                                              (grmr/any read-integer
+                                                                        (apply-to (fn [q-ast]
+                                                                                    (ast/untag (.q-val q-ast)))
+                                                                                  read-quoted)
+                                                                        read-type-literal)
+                                                              (grmr/any read-integer
+                                                                        (apply-to (fn [q-ast]
+                                                                                    (ast/untag (.q-val q-ast)))
+                                                                                  read-quoted)
+                                                                        read-type-literal
+                                                                        read-type-constraint)))
+                                 ignore-whitespace
+                                 (grmr/any (grmr/ignore "}")
+                                           (grmr/error "Missing \"}\"."))))))
+
+(def read-expected-type
+  (grmr/rule read-sub-exp-type
+             (grmr/any read-type-literal
+                       read-integer
+                       read-string
+                       read-arity-map
+                       (apply-to identity
+                                 (grmr/ignore "[")
+                                 (grmr/none-or-more read-sub-exp-type)
+                                 read-close-bracket)
+                       (apply-to (fn [q-ast]
+                                   (ast/untag (.q-val q-ast)))
+                                 read-quoted)
+                       read-type-constraint)))
+
+(def read-is-type
+  (grmr/rule "is-type"
+             (apply-to (fn [file line type-expr expr]
+                         (ast/IsType type-expr expr))
+                       read-open-paren
+                       ignore-whitespace
+                       (grmr/ignore "is-type")
+                       (grmr/get-value 'file-name)
+                       (grmr/get-value 'line-number)
+                       ignore-whitespace
+                       (grmr/any (apply-to (fn [proto-sym type-sym]
+                                             (ast/GetImpl proto-sym type-sym c/top-type))
+                                           (grmr/ignore "(#impl")
+                                           ignore-whitespace
+                                           read-symbol
+                                           ignore-whitespace
+                                           (grmr/optional read-symbol c/no-symbol)
+                                           read-close-paren)
+                                 read-expr)
+                       read-expected-type
+                       read-close-paren)))
+
+(def read-show-type
+  (grmr/rule "show-type"
+             (apply-to (fn [loc expr]
+                         (ast/call-expr [(ast/tag "show-type" loc) expr]))
+                       read-open-paren
+                       ignore-whitespace
+                       (grmr/ignore "show-type")
+                       (apply-to c/Location
+                                 (grmr/get-value 'file-name)
+                                 (grmr/get-value 'line-number))
+                       ignore-whitespace
+                       read-sub-expr
+                       read-close-paren)))
+
 (def top-level
   (grmr/rule "top-level"
              (apply-to identity
@@ -1376,8 +1697,8 @@
                                  ;; read-JS-callable
                                  read-inline
                                  ;; read-add-ns
-                                 ;; read-show-type
-                                 ;; read-is-type
+                                 read-show-type
+                                 read-is-type
                                  ;; shebang
                                  bad-expr
                                  ;; TODO: detect end of input
