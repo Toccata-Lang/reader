@@ -1247,28 +1247,33 @@
                                         ast/cond-ast
                                         Vector))
                      rst))
-  (let [cont (-> (reverse rst)
-                 (reduce body (fn [cont expr]
-                                (cond (instance? Vector expr)
-                                      (ast/cond-expr expr cont)
+  (let [[cont] (-> (reverse rst)
+                   (reduce [body (maybe nothing)]
+                           (fn [[cont map?] expr]
+                             (cond (instance? Vector expr)
+                                   [(ast/cond-expr expr cont) map?]
 
-                                      (instance? ast/binding-ast expr)
-                                      (ast/call-ast (ast/tag 'flat-map (ast/location expr))
-                                                    [(.val expr)
-                                                     (ast/fn-expr c/no-symbol
-                                                                  [(ast/fn-arity
-                                                                    (ast/params [(.binding expr)])
-                                                                    "" [cont])])]
-                                                    c/top-type)
+                                   (instance? ast/binding-ast expr)
+                                   [(ast/call-ast (cond map?
+                                                        (ast/tag 'map (ast/location expr))
+                                                        (ast/tag 'flat-map (ast/location expr)))
+                                                  [(.val expr)
+                                                   (ast/fn-expr c/no-symbol
+                                                                [(ast/fn-arity
+                                                                  (ast/params [(.binding expr)])
+                                                                  "" [cont])])]
+                                                  c/top-type)
+                                    nothing]
 
-                                      (instance? ast/cond-ast expr)
-                                      (cond (instance? ast/block-comment-ast (.value expr))
-                                            (.value expr cont)
-                                            (.cont expr cont))
+                                   (instance? ast/cond-ast expr)
+                                   [(cond (instance? ast/block-comment-ast (.value expr))
+                                          (.value expr cont)
+                                          (.cont expr cont))
+                                    map?]
 
-                                      (do
-                                        (print-err "Parser error" _FILE_ _LINE_)
-                                        (abort))))))
+                                   (do
+                                     (print-err "Parser error" _FILE_ _LINE_)
+                                     (abort))))))
         wrapper (ast/tag (gensym "wrap") (ast/location fst))]
     (ast/binding-ast wrapper (.val fst)
                      (ast/call-ast (ast/tag 'flat-map (ast/location fst))
