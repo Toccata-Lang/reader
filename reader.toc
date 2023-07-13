@@ -11,7 +11,7 @@
 ;; The different types of nodes in the AST
 (add-ns ast (git-dependency "https://github.com/Toccata-Lang/ast.git"
                             "ast.toc"
-                            :sha "6e9855c"))
+                            :sha "e66b85f"))
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
@@ -703,6 +703,15 @@
                (.type-symbol c/empty-reified (ast/untag type-sym)))
       (c/update-path (ast/location type-sym))))
 
+(def read-singleton-type
+  (grmr/rule "singleton"
+             (apply-to identity
+                       ignore-whitespace
+                       (grmr/any (apply-to (fn [s]
+                                             (c/sum-c [(c/StrBuffConstraint s)
+                                                       (c/SubStrConstraint s)]))
+                                           read-string)))))
+
 (def read-type-expr
   (grmr/rule read-sub-type
              (grmr/any read-sum-type
@@ -723,6 +732,7 @@
                        read-max-val-assertion
                        read-inner-type-of-type
                        read-seq-type
+                       read-singleton-type
                        (apply-to assert-type
                                  ignore-whitespace
                                  read-symbol))))
@@ -1452,38 +1462,33 @@
              (apply-to identity
                        read-open-paren
                        (grmr/ignore "deftype")
-                       (grmr/any ;; (apply-to ast/type-expr
-                                 ;;           (grmr/ignore
-                                 ;;            (grmr/one-or-more whitespace))
-                                 ;;           (grmr/any read-symbol
-                                 ;;                     (grmr/error "'deftype' must be followed by a"
-                                 ;;                                 "type name."))
-                                 ;;           (grmr/any read-list-destructure
-                                 ;;                     (grmr/error "Fields (if any) for a new type must be"
-                                 ;;                                 "enclosed by square brackets [ ]."))
-
-                                 ;;           (grmr/none-or-more read-proto-impls)
-                                 ;;           read-close-paren)
-                                 (apply-to (fn [sym type-c]
+                       (grmr/any (apply-to (fn [sym type-c]
                                              (ast/definition sym (list type-c)))
                                            (grmr/ignore
                                             (grmr/one-or-more whitespace))
                                            (grmr/any read-symbol
                                                      (grmr/error "'deftype' must be followed by a"
                                                                  "type name."))
-                                           (grmr/any read-sum-type
-                                                     read-multi-type
-                                                     ;; read-map-assertion
-                                                     ;; read-seq-of
-                                                     ;; read-seq-as
-                                                     ;; read-generic-type
-                                                     )
+                                           read-type-expr
+                                           read-close-paren)
+                                 (apply-to ast/type-expr
+                                           (grmr/ignore (grmr/one-or-more whitespace))
+                                           (grmr/any read-symbol
+                                                     (grmr/error "'deftype' must be followed by a"
+                                                                 "type name."))
+                                           (grmr/any read-list-destructure
+                                                     (grmr/error "Fields (if any) for a new type"
+                                                                 "must be enclosed by square"
+                                                                 "brackets [ ]."))
+
+                                           (grmr/none-or-more read-proto-impls)
                                            read-close-paren)
                                  (grmr/error "Invalid 'deftype' expression.")))))
 
 (def bad-expr
   (grmr/rule "bad-expr"
              (grmr/all ignore-whitespace "("
+                       (debug 'bad-expr)
                        (grmr/error "Invalid expression"))))
 
 ;; TODO: for regression testing type checker
