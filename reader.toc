@@ -11,11 +11,11 @@
 ;; The different types of nodes in the AST
 (add-ns ast (git-dependency "https://github.com/Toccata-Lang/ast.git"
                             "ast.toc"
-                            :sha "e66b85f"))
+                            :sha "19605e9"))
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
-                          :sha "79ec098"))
+                          :sha "30a4d1a"))
 (defn min [x y]
   (either (< x y)
           y))
@@ -1457,6 +1457,15 @@
                                            read-close-paren)
                                  (grmr/error "Invalid 'extend-type' expression.")))))
 
+(def read-type-const
+  (grmr/rule "type-const"
+             (apply-to (fn [sym fields impls]
+                         (ast/type-expr sym fields impls))
+                       ignore-whitespace
+                       read-symbol
+                       read-list-destructure
+                       (grmr/none-or-more read-proto-impls))))
+
 (def read-deftype
   (grmr/rule "deftype"
              (apply-to identity
@@ -1469,21 +1478,21 @@
                                            (grmr/any read-symbol
                                                      (grmr/error "'deftype' must be followed by a"
                                                                  "type name."))
-                                           read-type-expr
-                                           read-close-paren)
-                                 (apply-to ast/type-expr
+                                           read-type-expr)
+                                 (apply-to (fn [sym type-constructors]
+                                             (ast/rec-type-ast sym type-constructors))
                                            (grmr/ignore (grmr/one-or-more whitespace))
                                            (grmr/any read-symbol
                                                      (grmr/error "'deftype' must be followed by a"
                                                                  "type name."))
-                                           (grmr/any read-list-destructure
-                                                     (grmr/error "Fields (if any) for a new type"
-                                                                 "must be enclosed by square"
-                                                                 "brackets [ ]."))
-
-                                           (grmr/none-or-more read-proto-impls)
-                                           read-close-paren)
-                                 (grmr/error "Invalid 'deftype' expression.")))))
+                                           (grmr/one-or-more
+                                            (apply-to identity
+                                                      read-open-paren
+                                                      read-type-const
+                                                      read-close-paren)))
+                                 read-type-const
+                                 (grmr/error "Invalid 'deftype' expression."))
+                       read-close-paren)))
 
 (def bad-expr
   (grmr/rule "bad-expr"
