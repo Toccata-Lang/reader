@@ -11,11 +11,11 @@
 ;; The different types of nodes in the AST
 (add-ns ast (git-dependency "https://github.com/Toccata-Lang/ast.git"
                             "ast.toc"
-                            :sha "12f1bdd"))
+                            :sha "4520e13"))
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
-                          :sha "a242115"))
+                          :sha "2dfd6af"))
 (defn min [x y]
   (either (< x y)
           y))
@@ -1701,19 +1701,31 @@
                        read-sub-expr
                        read-close-paren)))
 
+(def read-main
+  (grmr/rule "main"
+             (apply-to ast/annotated
+                       read-open-paren
+                       (grmr/ignore "main")
+                       (grmr/any (apply-to ast/main-fn
+                                           read-list-destructure
+                                           (grmr/any read-inline-body
+                                                     (grmr/one-or-more read-expr)
+                                                     (grmr/error "Body of 'main' fn is wrong."))
+                                           read-close-paren)
+                                 (grmr/error "'main' fn expression is wrong.")))))
+
 (def top-level
   (grmr/rule "top-level"
              (apply-to identity
                        ignore-whitespace
-                       ;; (grmr/catch-error
-                       ;;  output-error)
+                       ;; (grmr/catch-error output-error)
                        (grmr/any read-defn
                                  read-def
                                  read-defprotocol
                                  read-deftype
                                  read-extend-type
-                                 ;; read-block-comment
-                                 ;; read-main
+                                 read-block-comment
+                                 read-main
                                  ;; read-JS-callable
                                  read-inline
                                  ;; read-add-ns
