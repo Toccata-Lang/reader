@@ -11,11 +11,11 @@
 ;; The different types of nodes in the AST
 (add-ns ast (git-dependency "https://github.com/Toccata-Lang/ast.git"
                             "ast.toc"
-                            :sha "90d5ffb"))
+                            :sha "9bb79fe"))
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
-                          :sha "d0ce206"))
+                          :sha "7c85dc8"))
 (defn min [x y]
   (either (< x y)
           y))
@@ -941,7 +941,7 @@
              (apply-to identity
                        (grmr/ignore "[")
                        (apply-to (fn [fn ln elems]
-                                   (ast/call-expr (cons (ast/tag 'vector (c/Location fn ln))
+                                   (ast/call-expr (cons (c/tag 'vector (c/Location fn ln))
                                                         (seq elems))))
                                  (grmr/get-value 'file-name)
                                  (grmr/get-value 'line-number)
@@ -953,7 +953,7 @@
              (apply-to identity
                        (grmr/ignore "{")
                        (apply-to (fn [fn ln elems]
-                                   (ast/call-expr (cons (ast/tag 'hash-map (c/Location fn ln))
+                                   (ast/call-expr (cons (c/tag 'hash-map (c/Location fn ln))
                                                         (comp* empty-list elems))))
                                  (grmr/get-value 'file-name)
                                  (grmr/get-value 'line-number)
@@ -967,7 +967,7 @@
              (apply-to identity
                        (grmr/ignore "#{")
                        (apply-to (fn [fn ln elems]
-                                   (ast/call-expr (cons (ast/tag 'hash-set (c/Location fn ln))
+                                   (ast/call-expr (cons (c/tag 'hash-set (c/Location fn ln))
                                                         (seq elems))))
                                  (grmr/get-value 'file-name)
                                  (grmr/get-value 'line-number)
@@ -1008,10 +1008,10 @@
                       :let [frms (rest quoted-list)]
                       contents (or (empty? frms)
                                    (maybe (map frms quote-literal)))]
-                  (ast/call-ast (ast/tag 'vector (ast/location quoted-list))
+                  (ast/call-ast (c/tag 'vector (ast/location quoted-list))
                                 (vec contents)
                                 c/top-type)))
-            (ast/call-ast (ast/tag 'list (ast/location quoted-list))
+            (ast/call-ast (c/tag 'list (ast/location quoted-list))
                           (vec (map quoted-list quote-literal))
                           c/top-type))))
 
@@ -1028,10 +1028,10 @@
                       :let [frms (rest quoted-vect)]
                       contents (or (empty? frms)
                                    (maybe (map frms quote-literal)))]
-                  (ast/call-ast (ast/tag 'vector (ast/location quoted-vect))
+                  (ast/call-ast (c/tag 'vector (ast/location quoted-vect))
                                 contents
                                 c/top-type)))
-            (ast/call-ast (ast/tag 'list (ast/location quoted-vect))
+            (ast/call-ast (c/tag 'list (ast/location quoted-vect))
                           (map quoted-vect quote-literal)
                           c/top-type))))
 
@@ -1200,13 +1200,13 @@
                                  (grmr/error "Missing 'cond' default clause."))
                        read-close-paren)))
 
-(def wrapper-sym (ast/tag "#wrapper"))
+(def wrapper-sym (c/tag "#wrapper"))
 
 (def read-for-when
   (grmr/rule "for-when"
              (apply-to (fn [fn ln clause]
                          (ast/cond-ast clause (ast/block-comment fn ln [])
-                                       (ast/call-ast (ast/tag 'zero (c/Location fn ln))
+                                       (ast/call-ast (c/tag 'zero (c/Location fn ln))
                                                      [wrapper-sym] c/top-type)
                                        c/top-type))
                        (grmr/get-value 'file-name)
@@ -1219,7 +1219,7 @@
 (def read-for-when-not
   (grmr/rule "for-when-not"
              (apply-to (fn [fn ln clause]
-                         (ast/cond-ast clause (ast/call-ast (ast/tag 'zero (c/Location fn ln))
+                         (ast/cond-ast clause (ast/call-ast (c/tag 'zero (c/Location fn ln))
                                                             [wrapper-sym] c/top-type)
                                        (ast/block-comment fn ln [])
                                        c/top-type))
@@ -1265,8 +1265,8 @@
 
                                    (instance? ast/binding-ast expr)
                                    [(ast/call-ast (cond map?
-                                                        (ast/tag 'map (ast/location expr))
-                                                        (ast/tag 'flat-map (ast/location expr)))
+                                                        (c/tag 'map (ast/location expr))
+                                                        (c/tag 'flat-map (ast/location expr)))
                                                   [(.val expr)
                                                    (ast/fn-expr c/no-symbol
                                                                 [(ast/fn-arity
@@ -1284,9 +1284,9 @@
                                    (do
                                      (print-err "Parser error" _FILE_ _LINE_)
                                      (abort))))))
-        wrapper (ast/tag (gensym "wrap") (ast/location fst))]
+        wrapper (c/tag (gensym "wrap") (ast/location fst))]
     (ast/binding-ast wrapper (.val fst)
-                     (ast/call-ast (ast/tag 'flat-map (ast/location fst))
+                     (ast/call-ast (c/tag 'flat-map (ast/location fst))
                                    [wrapper
                                     (ast/fn-expr c/no-symbol
                                                  [(ast/fn-arity
@@ -1688,7 +1688,7 @@
 (def read-show-type
   (grmr/rule "show-type"
              (apply-to (fn [loc expr]
-                         (ast/call-expr [(ast/tag "show-type" loc) expr]))
+                         (ast/call-expr [(c/tag "show-type" loc) expr]))
                        read-open-paren
                        ignore-whitespace
                        (grmr/ignore "show-type")
