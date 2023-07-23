@@ -11,11 +11,11 @@
 ;; The different types of nodes in the AST
 (add-ns ast (git-dependency "https://github.com/Toccata-Lang/ast.git"
                             "ast.toc"
-                            :sha "8b144c4"))
+                            :sha "90d5ffb"))
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
-                          :sha "42efdc1"))
+                          :sha "d0ce206"))
 (defn min [x y]
   (either (< x y)
           y))
@@ -132,11 +132,11 @@
                                                ""
 
                                                (str ns "/"))]
-                           (ast/tagged-symbol ns
-                                              (symbol (to-str (comp [start] the-rest)))
-                                              (symbol (to-str (comp (list ns-prefix start)
-                                                                    the-rest)))
-                                              (c/Location file-name line-number) c/top-type)))
+                           (c/TaggedSymbol ns
+                                           (symbol (to-str (comp [start] the-rest)))
+                                           (symbol (to-str (comp (list ns-prefix start)
+                                                                 the-rest)))
+                                           (c/Location file-name line-number) c/top-type)))
                        (grmr/get-value 'file-name)
                        (grmr/get-value 'line-number)
                        (grmr/optional read-namespace c/no-symbol)
@@ -321,7 +321,7 @@
 
 (defn assert-max-value [file-name line-number max]
   (-> c/int-constraint
-      (assoc-in [.fields 'max] max)
+      (assoc-in [.fields c/max-key] max)
       (c/update-path (c/Location file-name line-number))))
 
 (def read-max-val-assertion
@@ -339,7 +339,7 @@
 
 (defn assert-min-value [file-name line-number min]
   (-> c/int-constraint
-      (assoc-in [.fields 'min] min)
+      (assoc-in [.fields c/min-key] min)
       (c/update-path (c/Location file-name line-number))))
 
 (def read-min-val-assertion
@@ -700,7 +700,7 @@
 
 (defn assert-type [type-sym]
    (-> (either (get c/core-type-constraints type-sym)
-               (.type-symbol c/empty-reified (ast/untag type-sym)))
+               (.type-symbol c/empty-reified type-sym))
       (c/update-path (ast/location type-sym))))
 
 (def read-singleton-type
@@ -740,7 +740,7 @@
 (def read-type-assertion
   (grmr/rule "assertion-type"
              (apply-to (fn [type-expr sym]
-                         (c/update-sym type-expr (ast/untag sym)))
+                         (c/update-sym type-expr sym))
                        read-open-paren
                        ignore-whitespace
                        (grmr/ignore "instance?")
@@ -767,7 +767,7 @@
                                    (assert (instance? c/SymbolConstraints c))
                                    (-> c
                                        (c/update-path (ast/location sym))
-                                       (c/update-sym (ast/untag sym))))
+                                       (c/update-sym sym)))
                                  ignore-whitespace
                                  (grmr/ignore "!")
                                  (grmr/ignore (grmr/any " " read-string-tab))
@@ -782,7 +782,7 @@
 (def read-assert-result
   (grmr/rule "assert-result"
              (grmr/any (apply-to (fn [c]
-                                   (c/update-sym c (ast/untag ast/result-sym)))
+                                   (c/update-sym c ast/result-sym))
                                  read-open-paren
                                  (grmr/ignore "assert-result")
                                  (grmr/ignore (grmr/one-or-more whitespace))
@@ -795,7 +795,7 @@
                                            (grmr/error "Missing type assertion in 'assert-result' expression."))
                                  read-close-paren)
                        (apply-to (fn [c]
-                                   (c/update-sym c (ast/untag ast/result-sym)))
+                                   (c/update-sym c ast/result-sym))
                                  ignore-whitespace
                                  (grmr/ignore "!returns")
                                  ignore-whitespace
@@ -1620,8 +1620,7 @@
                        (grmr/one-or-more (apply-to identity
                                                    ignore-whitespace
                                                    (grmr/any read-sub-exp-type
-                                                             (apply-to (fn [q-ast]
-                                                                         (ast/untag (.q-val q-ast)))
+                                                             (apply-to .q-val
                                                                        read-quoted)
                                                              read-string
                                                              read-integer)))
@@ -1636,13 +1635,11 @@
                                                       (assoc m k v))))
                                  (grmr/none-or-more (grmr/all ignore-whitespace
                                                               (grmr/any read-integer
-                                                                        (apply-to (fn [q-ast]
-                                                                                    (ast/untag (.q-val q-ast)))
+                                                                        (apply-to .q-val
                                                                                   read-quoted)
                                                                         read-type-literal)
                                                               (grmr/any read-integer
-                                                                        (apply-to (fn [q-ast]
-                                                                                    (ast/untag (.q-val q-ast)))
+                                                                        (apply-to .q-val
                                                                                   read-quoted)
                                                                         read-type-literal
                                                                         read-type-constraint)))
@@ -1662,8 +1659,7 @@
                                                               ignore-whitespace
                                                               read-sub-exp-type))
                                  read-close-bracket)
-                       (apply-to (fn [q-ast]
-                                   (ast/untag (.q-val q-ast)))
+                       (apply-to .q-val
                                  read-quoted)
                        read-type-constraint)))
 
