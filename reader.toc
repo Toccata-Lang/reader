@@ -11,11 +11,11 @@
 ;; The different types of nodes in the AST
 (add-ns ast (git-dependency "https://github.com/Toccata-Lang/ast.git"
                             "ast.toc"
-                            :sha "58c9645"))
+                            :sha "d0b942d"))
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
-                          :sha "72ab8d3"))
+                          :sha "f1b1b66"))
 
 (def lflf "\n\n")
 
@@ -1298,18 +1298,18 @@
                                            (abort))))))
               wrapper (c/tag (gensym "wrap") (ast/location fst))]
           (ast/binding-ast wrapper (.val fst)
-                           (ast/call-ast (c/tag 'flat-map (ast/location fst))
-                                         [wrapper
-                                          (ast/fn-expr c/no-symbol
-                                                       [(ast/fn-arity
-                                                         (ast/params [(.binding fst)])
-                                                         ""
-                                                         [(cata (fn [x]
-                                                                  (cond (= x wrapper-sym)
-                                                                        wrapper
-                                                                        x))
-                                                                cont)])])]
-                                         c/top-type)
+                           [(ast/call-ast (c/tag 'flat-map (ast/location fst))
+                                           [wrapper
+                                            (ast/fn-expr c/no-symbol
+                                                         [(ast/fn-arity
+                                                           (ast/params [(.binding fst)])
+                                                           ""
+                                                           [(cata (fn [x]
+                                                                    (cond (= x wrapper-sym)
+                                                                          wrapper
+                                                                          x))
+                                                                  cont)])])]
+                                           c/top-type)]
                            c/top-type))))
 
 (def read-for
