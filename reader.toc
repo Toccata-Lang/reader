@@ -15,7 +15,7 @@
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
-                          :sha "e5d543a"))
+                          :sha "2927849"))
 
 (def lflf "\n\n")
 
@@ -302,9 +302,7 @@
 
 (defn assert-min-count [file-name line-number len]
   ;; TODO: what was I thinking doing it this way. (Actually, I know.)
-  (-> c/seq-constraint
-      (c/set-items (repeat len c/top-type))
-      (c/set-tail c/coll-of-any)
+  (-> (c/seq-c (repeat len c/top-type) c/coll-of-any)
       (c/update-path (c/Location file-name line-number))))
 
 ;; TODO: might be useful to have a max count
@@ -547,8 +545,7 @@
    ;;                (c/intersect c/promise-constraint
    ;;                             (c/CollectionOf contents empty-list c/no-symbol "")))
    "sequence-of" (fn [contents]
-                   (c/set-tail c/seq-constraint
-                               (c/CollectionOf contents empty-list c/no-symbol "")))
+                   (c/seq-c [] (c/coll-of-c contents)))
    "function-returns" (fn [contents]
                         (c/intersect c/fn-constraint
                                      (c/CollectionOf contents empty-list c/no-symbol "")))
@@ -606,9 +603,7 @@
 (def read-seq-of
   (grmr/rule "seq-of"
              (apply-to (fn [file line [seq-constraint] item-types tail-type]
-                         (-> seq-constraint
-                             (c/set-items item-types)
-                             (c/set-tail tail-type)
+                         (-> (c/seq-c item-types tail-type)
                              (c/update-path (c/Location file line))))
                        read-open-paren
                        ignore-whitespace
@@ -629,9 +624,7 @@
 (def read-seq-as
   (grmr/rule "seq-as"
              (apply-to (fn [file line [seq-constraint] items-types tail-type]
-                         (-> seq-constraint
-                             (c/set-items items-types)
-                             (c/set-tail tail-type)
+                         (-> (c/seq-c items-types tail-type)
                              (c/update-path (c/Location file line))))
                        read-open-paren
                        ignore-whitespace
@@ -1579,7 +1572,8 @@
                        "c/FnConstraint" c/FnConstraint
                        "c/fn-c " c/fn-c
                        "c/fn-arity" c/fn-arity
-                       "c/ListConstraint" c/ListConstraint
+                       "c/seq-c" c/seq-c
+                       "c/vec-c" c/vect-c
                        "c/list-c " c/list-c
                        "c/param " c/param
                        "c/tag" c/tag
@@ -1591,7 +1585,6 @@
                        "c/StrBuffConstraint" c/StrBuffConstraint
                        "c/SubStrConstraint" c/SubStrConstraint
                        "c/hashmap-c " c/hashmap-c
-                       "c/VectorConstraint" c/VectorConstraint
                        "c/vect-c " c/vect-c
                        "c/AgentConstraint" c/AgentConstraint
                        "c/FutureConstraint" c/FutureConstraint
@@ -1740,8 +1733,11 @@
                                  ;; read-JS-callable
                                  read-inline
                                  ;; read-add-ns
+
+                                 ;; for core-types.toc
                                  read-show-type
                                  read-is-type
+
                                  ;; shebang
                                  bad-expr
                                  ;; TODO: detect end of input
