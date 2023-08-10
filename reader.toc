@@ -11,11 +11,11 @@
 ;; The different types of nodes in the AST
 (add-ns ast (git-dependency "https://github.com/Toccata-Lang/ast.git"
                             "ast.toc"
-                            :sha "c390940"))
+                            :sha "08289ee"))
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
-                          :sha "2927849"))
+                          :sha "1827d32"))
 
 (def lflf "\n\n")
 
@@ -602,17 +602,18 @@
 ;; seq-of specifies the kinds of items in the seq
 (def read-seq-of
   (grmr/rule "seq-of"
-             (apply-to (fn [file line [seq-constraint] item-types tail-type]
+             (apply-to (fn [file line [seq-type] item-types tail-type]
                          (-> (c/seq-c item-types tail-type)
+                             (c/set-seq-type seq-type)
                              (c/update-path (c/Location file line))))
                        read-open-paren
                        ignore-whitespace
                        (grmr/get-value 'file-name)
                        (grmr/get-value 'line-number)
                        (grmr/any (grmr/all (grmr/ignore "list-of")
-                                           (grmr/always c/list-constraint))
+                                           (grmr/always c/ListType))
                                  (grmr/all (grmr/ignore "vector-of")
-                                           (grmr/always c/vect-constraint)))
+                                           (grmr/always c/VectorType)))
                        (grmr/optional read-seq-items [])
                        (grmr/optional (apply-to (fn [c]
                                                   (c/CollectionOf c empty-list c/no-symbol ""))
@@ -623,17 +624,18 @@
 ;; seq-as specifies the specific items and the exact tail constraint
 (def read-seq-as
   (grmr/rule "seq-as"
-             (apply-to (fn [file line [seq-constraint] items-types tail-type]
+             (apply-to (fn [file line [seq-type] items-types tail-type]
                          (-> (c/seq-c items-types tail-type)
+                             (c/set-seq-type seq-type)
                              (c/update-path (c/Location file line))))
                        read-open-paren
                        ignore-whitespace
                        (grmr/get-value 'file-name)
                        (grmr/get-value 'line-number)
                        (grmr/any (grmr/all (grmr/ignore "list-as")
-                                           (grmr/always c/list-constraint))
+                                           (grmr/always c/ListType))
                                  (grmr/all (grmr/ignore "vector-as")
-                                           (grmr/always c/vect-constraint)))
+                                           (grmr/always c/VectorType)))
                        (apply-to identity
                                  read-open-bracket
                                  (grmr/none-or-more read-sub-type)
