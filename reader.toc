@@ -11,7 +11,7 @@
 ;; The different types of nodes in the AST
 (add-ns ast (git-dependency "https://github.com/Toccata-Lang/ast.git"
                             "ast.toc"
-                            :sha "419e6f7"))
+                            :sha "e62b358"))
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
@@ -921,7 +921,7 @@
   (grmr/rule "_FILE_"
              (apply-to (fn [file-name line-num]
                          (ast/string-ast file-name (c/Location file-name line-num)
-                                         c/strbuff-constraint))
+                                         (c/StrBuffConstraint file-name)))
                        ignore-whitespace
                        (grmr/ignore "_FILE_")
                        (grmr/get-value 'file-name)
@@ -929,9 +929,12 @@
 
 (def curr-line
 (grmr/rule "_LINE_"
-           (apply-to identity
+           (apply-to (fn [file-name line-num]
+                       (ast/integer-ast line-num (c/Location file-name line-num)
+                                        (c/IntegerConstraint line-num)))
                      ignore-whitespace
                      (grmr/ignore "_LINE_")
+                     (grmr/get-value 'file-name)
                      (grmr/get-value 'line-number))))
 
 (def read-vector
@@ -1147,6 +1150,17 @@
                        read-destructure
                        read-sub-expr)))
 
+(def read-do
+  (grmr/rule "do"
+             (apply-to identity
+                       read-open-paren
+                       (grmr/ignore "do")
+                       ignore-whitespace
+                       (grmr/any (apply-to ast/do-expr
+                                           (grmr/one-or-more read-sub-expr)
+                                           read-close-paren)
+                                 (grmr/error "Invalid 'do' expression")))))
+
 (def read-let
   (grmr/rule "let"
              (apply-to identity
@@ -1349,7 +1363,7 @@
                                  read-cond
                                  read-fn
                                  read-let
-                                 ;; read-do
+                                 read-do
                                  ;; read-apply-to
                                  read-reify
                                  read-vector
@@ -1441,6 +1455,9 @@
                                                                  "of the value being defined."))
                                            ignore-whitespace
                                            (grmr/any read-inline
+                                                     ;; TODO: only for backward compatibility
+                                                     ;; remove after bootstrapping
+                                                     read-type-expr
                                                      read-expr)
                                            ignore-whitespace
                                            read-close-paren)
