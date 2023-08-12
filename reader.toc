@@ -332,7 +332,7 @@
                        ignore-whitespace
                        (grmr/get-value 'file-name)
                        (grmr/get-value 'line-number)
-                       (grmr/ignore "max")
+                       (grmr/ignore "max-value")
                        (grmr/ignore (grmr/one-or-more whitespace))
                        (grmr/any read-integer
                                  (grmr/error "The 'max' expression must contain an maximum integer value."))
@@ -1155,7 +1155,7 @@
              (apply-to identity
                        read-open-paren
                        (grmr/ignore "do")
-                       ignore-whitespace
+                       (grmr/ignore (grmr/one-or-more whitespace))
                        (grmr/any (apply-to ast/do-expr
                                            (grmr/one-or-more read-sub-expr)
                                            read-close-paren)
