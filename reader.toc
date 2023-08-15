@@ -11,11 +11,11 @@
 ;; The different types of nodes in the AST
 (add-ns ast (git-dependency "https://github.com/Toccata-Lang/ast.git"
                             "ast.toc"
-                            :sha "260d3a4"))
+                            :sha "351b676"))
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
-                          :sha "129dd0f"))
+                          :sha "da04d9a"))
 
 (def lflf "\n\n")
 
@@ -362,6 +362,8 @@
 (def read-type-of-result-type
   (grmr/rule "result-of"
              (apply-to (fn [file line c]
+                         (assert-result r (instance? c/SymbolConstraints r))
+
                          (-> (c/type-op c/call-value-op c c/no-args)
                              (c/update-path (c/Location file line))))
                        read-open-paren
@@ -379,6 +381,8 @@
 (def read-type-of-fn-call
   (grmr/rule "call-fn"
              (apply-to (fn [file line c arg-cs]
+                         (assert-result r (instance? c/SymbolConstraints r))
+
                          (let [arg-cs (comp* [] (seq arg-cs))]
                            (-> (c/type-op c/call-value-op c arg-cs)
                                (c/update-path (c/Location file line)))))
@@ -406,7 +410,9 @@
 (def read-inner-type-of-type
   (grmr/rule "inner-type-of"
              (apply-to (fn [file line c]
-                         (-> (.base c/inner-type-of c)
+                         (assert-result r (instance? c/SymbolConstraints r))
+
+                         (-> (c/type-op c/inner-type-of-op c)
                              (c/update-path (c/Location file line))))
                        read-open-paren
                        ignore-whitespace
@@ -439,6 +445,8 @@
 (def read-type-of-arg-type
   (grmr/rule "type-of-arg"
              (apply-to (fn [file line c arg-pos]
+                         (assert-result r (instance? c/SymbolConstraints r))
+
                          (-> (c/type-op c/arg-of-op c (.int arg-pos))
                              (c/update-path (c/Location file line))))
                        read-open-paren
@@ -573,6 +581,8 @@
 (def read-type-of-fn-apply
   (grmr/rule "apply-fn"
              (apply-to (fn [file line c arg-cs]
+                         (assert-result r (instance? c/SymbolConstraints r))
+
                          (-> (c/type-op c/apply-op c arg-cs)
                              (c/update-path (c/Location file line))))
                        read-open-paren
@@ -646,6 +656,8 @@
 (def read-concat-type
   (grmr/rule "concat"
              (apply-to (fn [file line c]
+                         (assert-result r (instance? c/SymbolConstraints r))
+
                          (-> (c/type-op c/concat-op c c/no-args)
                              (c/update-path (c/Location file line))))
                        read-open-paren
@@ -662,24 +674,21 @@
                        read-close-paren)))
 
 (def seq-assertions
-  {"vector-from" c/vect-from
-   "list-from" c/list-from
-   "rest-of" c/rest-of
-   "butlast-of" c/butlast-of
-   "first-of" c/first-of
-   "last-of" c/last-of})
+  {"vector-from" c/vect-from-op
+   "list-from" c/list-from-op
+   "rest-of" c/rest-of-op
+   "butlast-of" c/butlast-of-op
+   "first-of" c/first-of-op
+   "last-of" c/last-of-op})
 
 (def read-seq-type
   (grmr/rule "seq-type"
              (apply-to (fn [base-string file line c]
                          (either (map (get seq-assertions base-string)
                                       (fn [op-c]
-                                        (-> (cata (fn [inner]
-                                                    (cond (instance? c/TypeOp inner)
-                                                          (.base inner (c/update-path c (c/Location file line)))
+                                        (assert-result r (instance? c/SymbolConstraints r))
 
-                                                          inner))
-                                                  op-c)
+                                        (-> (c/type-op op-c c)
                                             (c/update-path (c/Location file line)))))
                                  (do
                                    (print-err "No modified sequence type" (str "'" base-string "'")
@@ -763,6 +772,7 @@
                                  read-close-paren)
                        (apply-to (fn [sym c]
                                    (assert (instance? c/SymbolConstraints c))
+
                                    (-> c
                                        (c/update-path (ast/location sym))
                                        (c/update-sym sym)))
@@ -1554,9 +1564,7 @@
                     "c/hash-coll-constraint" c/hash-coll-constraint
                     "c/promise-constraint" c/promise-constraint
                     "c/future-constraint" c/future-constraint
-                    "c/inner-type-of" c/inner-type-of
                     "c/inner-type-of-op" c/inner-type-of-op
-                    "c/result-of" c/result-of
                     "c/string-constraint" c/string-constraint
                     "c/strbuff-constraint" c/strbuff-constraint
                     "c/substr-constraint" c/substr-constraint
