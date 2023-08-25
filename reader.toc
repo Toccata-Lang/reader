@@ -1760,14 +1760,11 @@
                                  read-inline
                                  ;; read-add-ns
 
-                                 ;; for core-types.toc
-                                 read-show-type
-                                 read-is-type
+                                 ;; ;; for core-types.toc
+                                 ;; read-show-type
+                                 ;; read-is-type
 
                                  ;; shebang
                                  bad-expr
                                  ;; TODO: detect end of input
-
-                                 ;; TODO: remove when read-destructure is used somewhere
-                                 read-destructure
                                  ))))
