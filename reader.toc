@@ -11,11 +11,11 @@
 ;; The different types of nodes in the AST
 (add-ns ast (git-dependency "https://github.com/Toccata-Lang/ast.git"
                             "ast.toc"
-                            :sha "f361869"))
+                            :sha "7e0d62e"))
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
-                          :sha "590bae4"))
+                          :sha "45e2277"))
 
 (def lflf "\n\n")
 
@@ -322,7 +322,7 @@
 
 (defn assert-max-value [file-name line-number max]
   (-> c/int-constraint
-      (assoc-in [.fields c/max-key] max)
+      (.max max)
       (c/update-path (c/Location file-name line-number))))
 
 (def read-max-val-assertion
@@ -340,7 +340,7 @@
 
 (defn assert-min-value [file-name line-number min]
   (-> c/int-constraint
-      (assoc-in [.fields c/min-key] min)
+      (.min min)
       (c/update-path (c/Location file-name line-number))))
 
 (def read-min-val-assertion
@@ -715,8 +715,8 @@
              (apply-to identity
                        ignore-whitespace
                        (grmr/any (apply-to (fn [s]
-                                             (c/sum-c [(c/StrBuffConstraint s)
-                                                       (c/SubStrConstraint s)]))
+                                             (c/sum-c [(c/SubStrConstraint s empty-list c/no-symbol "")
+                                                       (c/StrConstraint s)]))
                                            read-string)))))
 
 (def read-type-expr
@@ -931,7 +931,7 @@
   (grmr/rule "_FILE_"
              (apply-to (fn [file-name line-num]
                          (ast/string-ast file-name (c/Location file-name line-num)
-                                         (c/StrBuffConstraint file-name)))
+                                         (c/StrConstraint file-name)))
                        ignore-whitespace
                        (grmr/ignore "_FILE_")
                        (grmr/get-value 'file-name)
@@ -941,7 +941,7 @@
 (grmr/rule "_LINE_"
            (apply-to (fn [file-name line-num]
                        (ast/integer-ast line-num (c/Location file-name line-num)
-                                        (c/IntegerConstraint line-num)))
+                                        (c/IntConstraint line-num)))
                      ignore-whitespace
                      (grmr/ignore "_LINE_")
                      (grmr/get-value 'file-name)
@@ -1606,7 +1606,7 @@
                        "c/tag" c/tag
                        "c/ParamConstraint" c/ParamConstraint
                        "c/MaybeConstraint" c/MaybeConstraint
-                       "c/IntegerConstraint" c/IntegerConstraint
+                       "c/IntConstraint" c/IntConstraint
                        "c/TypeOfConstraint" c/TypeOfConstraint
                        "c/SymbolConstraint" c/SymbolConstraint
                        "c/StrBuffConstraint" c/StrBuffConstraint
