@@ -11,7 +11,7 @@
 ;; The different types of nodes in the AST
 (add-ns ast (git-dependency "https://github.com/Toccata-Lang/ast.git"
                             "ast.toc"
-                            :sha "7e0d62e"))
+                            :sha "f78608c"))
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
@@ -866,7 +866,9 @@
                        (apply-to (fn [fn ln]
                                    (ast/block-comment fn ln [""]))
                                  (grmr/get-value 'file-name)
-                                 (grmr/get-value 'line-number)))))
+                                 (grmr/get-value 'line-number)
+                                 ;; TODO: actually read the comment lines
+                                 ))))
 
 (def read-impl-arity
   (grmr/rule "impl-arity"
@@ -1443,7 +1445,7 @@
                        (grmr/ignore (grmr/one-or-more whitespace))
                        (grmr/any (apply-to (fn [name arities]
                                              (ast/definition name
-                                               (list (ast/fn-expr name arities))))
+                                               [(ast/fn-expr name arities)]))
                                            (grmr/any read-symbol
                                                      (grmr/error "'defn' must be followed by"
                                                                  "the name of the function."))
@@ -1459,7 +1461,7 @@
                        (grmr/ignore "def")
                        (grmr/ignore (grmr/one-or-more whitespace))
                        (grmr/any (apply-to (fn [sym value]
-                                             (ast/definition sym (list value)))
+                                             (ast/definition sym [value]))
                                            (grmr/any read-symbol
                                                      (grmr/error "'def' must be followed by the name"
                                                                  "of the value being defined."))
@@ -1506,7 +1508,7 @@
                        read-open-paren
                        (grmr/ignore "deftype")
                        (grmr/any (apply-to (fn [sym type-c]
-                                             (ast/definition sym (list type-c)))
+                                             (ast/definition sym [type-c]))
                                            (grmr/ignore
                                             (grmr/one-or-more whitespace))
                                            (grmr/any read-symbol
