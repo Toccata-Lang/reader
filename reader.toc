@@ -11,7 +11,7 @@
 ;; The different types of nodes in the AST
 (add-ns ast (git-dependency "https://github.com/Toccata-Lang/ast.git"
                             "ast.toc"
-                            :sha "888f38e"))
+                            :sha "b4d6ace"))
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
@@ -286,16 +286,20 @@
 (def read-integer-literal
   (grmr/rule "number"
              (grmr/any (apply-to (fn [file-name line-num digits]
-                                   ;; TODO: could fully specify the int constraint here
-                                   (ast/integer-ast (str-to-int (to-str digits))
-                                                    (c/Location file-name line-num) c/int-constraint))
+                                   (let [n (str-to-int (to-str digits))]
+                                     (ast/integer-ast n
+                                                      (c/Location file-name line-num)
+                                                      ""
+                                                      (.static c/int-constraint n))))
                                  (grmr/get-value 'file-name)
                                  (grmr/get-value 'line-number)
                                  (grmr/one-or-more grmr/digit))
                        (apply-to (fn [file-name line-num digits]
-                                   ;; TODO: could fully specify the int constraint here
-                                   (ast/integer-ast (* -1 (str-to-int (to-str digits)))
-                                                    (c/Location file-name line-num) c/int-constraint))
+                                   (let [n (* -1 (str-to-int (to-str digits)))]
+                                     (ast/integer-ast n
+                                                      (c/Location file-name line-num)
+                                                      ""
+                                                      (.static c/int-constraint n))))
                                  (grmr/get-value 'file-name)
                                  (grmr/get-value 'line-number)
                                  (grmr/ignore "-")
@@ -820,8 +824,8 @@
                        (grmr/ignore "inline")
                        (grmr/ignore (grmr/one-or-more whitespace))
                        (grmr/any (apply-to (fn [file-name line-number lang return-type body]
-                                             (ast/inline-ast lang return-type
-                                                             body (c/Location file-name line-number)))
+                                             (ast/inline-ast lang return-type body
+                                                             (c/Location file-name line-number) ""))
                                            (grmr/get-value 'file-name)
                                            (grmr/get-value 'line-number)
                                            (grmr/any read-symbol
@@ -944,6 +948,7 @@
 (grmr/rule "_LINE_"
            (apply-to (fn [file-name line-num]
                        (ast/integer-ast line-num (c/Location file-name line-num)
+                                        ""
                                         (c/IntConstraint line-num)))
                      ignore-whitespace
                      (grmr/ignore "_LINE_")
