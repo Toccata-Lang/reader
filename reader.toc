@@ -11,7 +11,7 @@
 ;; The different types of nodes in the AST
 (add-ns ast (git-dependency "https://github.com/Toccata-Lang/ast.git"
                             "ast.toc"
-                            :sha "6705514"))
+                            :sha "1d5c3e6"))
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
@@ -1031,10 +1031,10 @@
                                    (maybe (map frms quote-literal)))]
                   (ast/call-ast (c/tag 'vector (ast/location quoted-list))
                                 (vec contents)
-                                c/top-type)))
+                                "" c/top-type)))
             (ast/call-ast (c/tag 'list (ast/location quoted-list))
                           (vec (map quoted-list quote-literal))
-                          c/top-type))))
+                          "" c/top-type))))
 
 (extend-type Vector
   QuoteLiteral
@@ -1050,11 +1050,10 @@
                       contents (or (empty? frms)
                                    (maybe (map frms quote-literal)))]
                   (ast/call-ast (c/tag 'vector (ast/location quoted-vect))
-                                contents
-                                c/top-type)))
+                                contents "" c/top-type)))
             (ast/call-ast (c/tag 'list (ast/location quoted-vect))
                           (map quoted-vect quote-literal)
-                          c/top-type))))
+                          "" c/top-type))))
 
 (def quoted-value (grmr/recurse "quoted-value"))
 
@@ -1099,7 +1098,7 @@
     (reduce exprs first-expr (fn [threaded expr]
                                (ast/call-ast (.call-target expr)
                                              (comp [threaded] (.args expr))
-                                             c/top-type)))))
+                                             "" c/top-type)))))
 
 (def read-thread-expr
   (grmr/rule "->exp"
@@ -1239,7 +1238,7 @@
              (apply-to (fn [fn ln clause]
                          (ast/cond-ast clause (ast/block-comment fn ln [])
                                        (ast/call-ast (c/tag 'zero (c/Location fn ln))
-                                                     [wrapper-sym] c/top-type)
+                                                     [wrapper-sym] "" c/top-type)
                                        c/top-type))
                        (grmr/get-value 'file-name)
                        (grmr/get-value 'line-number)
@@ -1252,7 +1251,7 @@
   (grmr/rule "for-when-not"
              (apply-to (fn [fn ln clause]
                          (ast/cond-ast clause (ast/call-ast (c/tag 'zero (c/Location fn ln))
-                                                            [wrapper-sym] c/top-type)
+                                                            [wrapper-sym] "" c/top-type)
                                        (ast/block-comment fn ln [])
                                        c/top-type))
                        (grmr/get-value 'file-name)
@@ -1296,7 +1295,7 @@
                                     [(ast/fn-arity
                                       (ast/params [(.binding fst)])
                                       "" [body])])]
-                      c/top-type)
+                      "" c/top-type)
         
         (let [[cont] (-> (reverse rst)
                          (reduce [body (maybe nothing)]
@@ -1313,7 +1312,7 @@
                                                                       [(ast/fn-arity
                                                                         (ast/params [(.binding expr)])
                                                                         "" [cont])])]
-                                                        c/top-type)
+                                                        "" c/top-type)
                                           nothing]
 
                                          (instance? ast/cond-ast expr)
@@ -1338,7 +1337,7 @@
                                                                           wrapper
                                                                           x))
                                                                   cont)])])]
-                                           c/top-type)]
+                                           "" c/top-type)]
                            c/top-type))))
 
 (def read-for
