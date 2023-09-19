@@ -11,7 +11,7 @@
 ;; The different types of nodes in the AST
 (add-ns ast (git-dependency "https://github.com/Toccata-Lang/ast.git"
                             "ast.toc"
-                            :sha "b4d6ace"))
+                            :sha "6705514"))
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
@@ -256,9 +256,10 @@
 (def read-string-literal
   (grmr/rule "string"
              (apply-to (fn [file-name line-num frags]
-                         ;; TODO: could fully specify the int constraint here
-                         (ast/string-ast (to-str frags) (c/Location file-name line-num)
-                                         c/strbuff-constraint))
+                         (let [str-val (to-str frags)]
+                           (ast/string-ast str-val (c/Location file-name line-num)
+                                           ""
+                                           (.static c/strbuff-constraint str-val))))
                        (grmr/ignore "\"")
                        (grmr/get-value 'file-name)
                        (grmr/get-value 'line-number)
@@ -938,6 +939,7 @@
   (grmr/rule "_FILE_"
              (apply-to (fn [file-name line-num]
                          (ast/string-ast file-name (c/Location file-name line-num)
+                                         ""
                                          (c/StrConstraint file-name)))
                        ignore-whitespace
                        (grmr/ignore "_FILE_")
@@ -1475,8 +1477,8 @@
                                            (grmr/any read-inline
                                                      ;; TODO: only for backward compatibility
                                                      ;; remove after bootstrapping
-                                                     read-type-expr
-                                                     read-expr)
+                                                     read-expr
+                                                     read-type-expr)
                                            ignore-whitespace
                                            read-close-paren)
                                  (apply-to ast/declare
