@@ -745,7 +745,8 @@
                        read-max-val-assertion
                        read-inner-type-of-type
                        read-seq-type
-                       read-singleton-type
+                       ;; TODO: put back in
+                       ;; read-singleton-type
                        (apply-to assert-type
                                  ignore-whitespace
                                  read-symbol))))
@@ -1476,8 +1477,8 @@
                                            (grmr/any read-inline
                                                      ;; TODO: only for backward compatibility
                                                      ;; remove after bootstrapping
-                                                     read-expr
-                                                     read-type-expr)
+                                                     read-type-expr
+                                                     read-expr)
                                            ignore-whitespace
                                            read-close-paren)
                                  (apply-to ast/declare
