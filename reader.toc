@@ -11,7 +11,7 @@
 ;; The different types of nodes in the AST
 (add-ns ast (git-dependency "https://github.com/Toccata-Lang/ast.git"
                             "ast.toc"
-                            :sha "f93f741"))
+                            :sha "9e6c507"))
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
@@ -745,8 +745,7 @@
                        read-max-val-assertion
                        read-inner-type-of-type
                        read-seq-type
-                       ;; TODO: put back in
-                       ;; read-singleton-type
+                       read-singleton-type
                        (apply-to assert-type
                                  ignore-whitespace
                                  read-symbol))))
@@ -1477,7 +1476,25 @@
                                            (grmr/any read-inline
                                                      ;; TODO: only for backward compatibility
                                                      ;; remove after bootstrapping
-                                                     read-type-expr
+                                                     (grmr/rule read-sub-type
+                                                                (grmr/any read-sum-type
+                                                                          read-multi-type
+                                                                          read-map-assertion
+                                                                          read-seq-of
+                                                                          read-seq-as
+                                                                          read-generic-type
+                                                                          read-type-of-arg-type
+                                                                          read-concat-type
+                                                                          read-type-of-result-type
+                                                                          read-type-of-fn-call
+                                                                          read-type-of-fn-apply
+                                                                          read-required-arities
+                                                                          read-type-of-type
+                                                                          read-min-count-assertion
+                                                                          read-min-val-assertion
+                                                                          read-max-val-assertion
+                                                                          read-inner-type-of-type
+                                                                          read-seq-type))
                                                      read-expr)
                                            ignore-whitespace
                                            read-close-paren)
