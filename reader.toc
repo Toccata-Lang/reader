@@ -11,7 +11,7 @@
 ;; The different types of nodes in the AST
 (add-ns ast (git-dependency "https://github.com/Toccata-Lang/ast.git"
                             "ast.toc"
-                            :sha "9e6c507"))
+                            :sha "8456e85"))
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
@@ -1338,6 +1338,7 @@
                                                                           x))
                                                                   cont)])])]
                                            "" c/top-type)]
+                           ""
                            c/top-type))))
 
 (def read-for
