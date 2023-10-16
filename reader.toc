@@ -11,7 +11,7 @@
 ;; The different types of nodes in the AST
 (add-ns ast (git-dependency "https://github.com/Toccata-Lang/ast.git"
                             "ast.toc"
-                            :sha "c41c707"))
+                            :sha "cd0abb2"))
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
@@ -824,16 +824,11 @@
                        read-open-paren
                        (grmr/ignore "inline")
                        (grmr/ignore (grmr/one-or-more whitespace))
-                       (grmr/any (apply-to (fn [file-name line-number lang return-type body]
-                                             (ast/inline-ast lang return-type body
+                       (grmr/any (apply-to (fn [file-name line-number return-type body]
+                                             (ast/inline-ast return-type body
                                                              (c/Location file-name line-number) ""))
                                            (grmr/get-value 'file-name)
                                            (grmr/get-value 'line-number)
-                                           (grmr/any read-symbol
-                                                     (grmr/error "An inline code expression must specify"
-                                                                 "the language of the code snippet."
-                                                                 "At this point, only 'C' is supported."))
-                                           (grmr/ignore (grmr/one-or-more whitespace))
                                            (grmr/optional
                                             (apply-to identity
                                                       read-type-expr
