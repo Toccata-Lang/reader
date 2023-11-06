@@ -11,11 +11,11 @@
 ;; The different types of nodes in the AST
 (add-ns ast (git-dependency "https://github.com/Toccata-Lang/ast.git"
                             "ast.toc"
-                            :sha "dc324ad"))
+                            :sha "26542ef"))
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
-                          :sha "dcba6be"))
+                          :sha "7df6fc3"))
 
 (def lflf "\n\n")
 
@@ -140,7 +140,7 @@
                                            (symbol (to-str (comp (list ns-prefix start)
                                                                  the-rest)))
                                            (c/Location file-name line-number)
-                                           "" c/top-type)))
+                                           c/no-symbol "" c/top-type)))
                        (grmr/get-value 'file-name)
                        (grmr/get-value 'line-number)
                        (grmr/optional read-namespace c/no-symbol)
