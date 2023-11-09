@@ -11,11 +11,11 @@
 ;; The different types of nodes in the AST
 (add-ns ast (git-dependency "https://github.com/Toccata-Lang/ast.git"
                             "ast.toc"
-                            :sha "26542ef"))
+                            :sha "a2587de"))
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
-                          :sha "7df6fc3"))
+                          :sha "c797d90"))
 
 (def lflf "\n\n")
 
@@ -26,10 +26,11 @@
 ;; sometimes, we have to see what's wrong
 (defn debug [tag]
   (grmr/ignore
-   (apply-to (fn [file text]
-               (print-err tag (count text)
+   (apply-to (fn [file line text]
+               (print-err (str file ": " line) tag (count text)
                           (str "\"" (subs text 0 (min 40 (count text))) "\"")))
              (grmr/get-value 'file-name)
+             (grmr/get-value 'line-number)
              grmr/get-text)))
 
 (def not-eol
@@ -889,34 +890,23 @@
 
 (def read-implementation
   (grmr/rule "protocol-implementation"
-             (apply-to (fn [fn-sym arities]
-                         {fn-sym (map arities (fn [arity]
-                                                (.fn-sym arity fn-sym)))})
+             (apply-to (fn [fn-sym arity]
+                         (.fn-sym arity fn-sym))
+                       ignore-whitespace
+                       (grmr/ignore (grmr/optional read-symbol))
                        read-open-paren
                        (grmr/any read-symbol
                                  (grmr/error "A prototype function implementation must have a name."))
-                       (apply-to vector read-impl-arity)
+                       read-impl-arity
                        read-close-paren)))
 
 
 (def read-proto-impls
   (grmr/rule "protocol-implementations"
-             (grmr/any read-assert
-                       (apply-to (fn [_] {})
-                                 read-block-comment)
-                       (apply-to hash-map
-                                 ignore-whitespace
-                                 (grmr/any read-symbol
-                                           (grmr/all "(" (grmr/error "Missing protocol name in expression.")))
-                                 (apply-to (fn [impl-arities]
-                                             ;; TODO: add this in eventually, requires changes to reify-ast,
-                                             ;; extend-ast, and type-ast.
-                                             ;; (reduce impl-arities {}
-                                             ;;         (fn [m arity]
-                                             ;;           (assert (instance? ast/fn-arity-ast arities))
-                                             ;;           (assoc m (-> arity .params .fixed count) arity)))
-                                             (apply merge-with (cons comp (seq impl-arities))))
-                                           (grmr/one-or-more read-implementation))))))
+             (grmr/none-or-more
+              (grmr/any read-assert
+                        read-block-comment
+                        read-implementation))))
 
 (def read-reify
   (grmr/rule "reify"
@@ -925,9 +915,7 @@
                        read-open-paren
                        (grmr/ignore "reify")
                        (grmr/ignore (grmr/one-or-more whitespace))
-                       (apply-to (fn [proto-impls]
-                                   (apply merge-with (cons comp (seq proto-impls))))
-                                 (grmr/one-or-more read-proto-impls))
+                       read-proto-impls
                        read-close-paren)))
 
 (def curr-file-name
@@ -1504,24 +1492,25 @@
              (apply-to identity
                        read-open-paren
                        (grmr/ignore "extend-type")
-                       (grmr/any (apply-to ast/type-extension
+                       (grmr/any (apply-to ast/extend-ast
                                            (grmr/ignore
                                             (grmr/one-or-more whitespace))
                                            (grmr/any read-symbol
                                                      (grmr/error "'extend-type' must be followed by a"
                                                                  "type name."))
-                                           (grmr/one-or-more read-proto-impls)
+                                           ignore-whitespace
+                                           read-proto-impls
                                            read-close-paren)
                                  (grmr/error "Invalid 'extend-type' expression.")))))
 
 (def read-type-const
   (grmr/rule "type-const"
              (apply-to (fn [sym fields impls]
-                         (ast/type-expr sym fields impls))
+                         (ast/type-ast sym fields impls))
                        ignore-whitespace
                        read-symbol
                        read-list-destructure
-                       (grmr/none-or-more read-proto-impls))))
+                       read-proto-impls)))
 
 (def read-deftype
   (grmr/rule "deftype"
@@ -1554,7 +1543,6 @@
 (def bad-expr
   (grmr/rule "bad-expr"
              (grmr/all ignore-whitespace "("
-                       (debug 'bad-expr)
                        (grmr/error "Invalid expression"))))
 
 ;; TODO: for regression testing type checker
