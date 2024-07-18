@@ -1137,11 +1137,10 @@
                        read-open-paren
                        (grmr/ignore "fn")
                        (grmr/ignore (grmr/one-or-more whitespace))
-                       (grmr/any (apply-to (fn [name arities]
-                                             (ast/fn-expr name arities))
+                       (grmr/any (apply-to identity
                                            (grmr/optional read-symbol c/no-symbol)
                                            ignore-whitespace
-                                           read-arities
+                                           read-single-arity
                                            read-close-paren)
                                  (grmr/error "Invalid 'fn' expression.")))))
 
