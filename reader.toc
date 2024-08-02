@@ -11,11 +11,11 @@
 ;; The different types of nodes in the AST
 (add-ns ast (git-dependency "https://github.com/Toccata-Lang/ast.git"
                             "ast.toc"
-                            :sha "a1eb8bb"))
+                            :sha "70df31c"))
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
-                          :sha "91611e8"))
+                          :sha "a4c915d"))
 
 (def lflf "\n\n")
 
@@ -1274,10 +1274,9 @@
   (cond (empty? rst)
         (ast/call-ast (c/tag 'map (ast/location fst))
                       [(.val fst)
-                       (ast/fn-expr c/no-symbol
-                                    [(ast/fn-arity
-                                      (ast/params [(.binding fst)])
-                                      "" [body])])]
+                       (ast/fn-arity
+                        (ast/params [(.binding fst)])
+                        "" [body])]
                       "" c/top-type)
         
         (let [[cont] (-> (reverse rst)
@@ -1291,10 +1290,9 @@
                                                               (c/tag 'map (ast/location expr))
                                                               (c/tag 'flat-map (ast/location expr)))
                                                         [(.val expr)
-                                                         (ast/fn-expr c/no-symbol
-                                                                      [(ast/fn-arity
-                                                                        (ast/params [(.binding expr)])
-                                                                        "" [cont])])]
+                                                         (ast/fn-arity
+                                                          (ast/params [(.binding expr)])
+                                                          "" [cont])]
                                                         "" c/top-type)
                                           nothing]
 
@@ -1311,15 +1309,14 @@
           (ast/binding-ast wrapper (.val fst)
                            [(ast/call-ast (c/tag 'flat-map (ast/location fst))
                                            [wrapper
-                                            (ast/fn-expr c/no-symbol
-                                                         [(ast/fn-arity
-                                                           (ast/params [(.binding fst)])
-                                                           ""
-                                                           [(cata (fn [x]
-                                                                    (cond (= x wrapper-sym)
-                                                                          wrapper
-                                                                          x))
-                                                                  cont)])])]
+                                            (ast/fn-arity
+                                             (ast/params [(.binding fst)])
+                                             ""
+                                             [(cata (fn [x]
+                                                      (cond (= x wrapper-sym)
+                                                            wrapper
+                                                            x))
+                                                    cont)])]
                                            "" c/top-type)]
                            ""
                            c/top-type))))
@@ -1434,14 +1431,14 @@
                        read-open-paren
                        (grmr/ignore "defn")
                        (grmr/ignore (grmr/one-or-more whitespace))
-                       (grmr/any (apply-to (fn [name arities]
+                       (grmr/any (apply-to (fn [name arity]
                                              (ast/definition name
-                                               [(ast/fn-expr name arities)]))
+                                               [arity]))
                                            (grmr/any read-symbol
                                                      (grmr/error "'defn' must be followed by"
                                                                  "the name of the function."))
                                            (grmr/ignore (grmr/one-or-more whitespace))
-                                           read-arities
+                                           read-single-arity
                                            read-close-paren)
                                  (grmr/error "Invalid 'defn' expression.")))))
 
