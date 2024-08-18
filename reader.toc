@@ -1111,6 +1111,8 @@
 (def read-single-arity
   (grmr/rule "single-arity"
              (apply-to (fn [params doc body]
+                         (assert (instance? Vector body))
+
                          (ast/fn-arity params doc body))
                        read-list-destructure
                        read-fn-doc
@@ -1543,201 +1545,197 @@
                        (grmr/error "Invalid expression"))))
 
 ;; TODO: for regression testing type checker
-(def read-sub-exp-type
-  (grmr/recurse "expected-type"))
+;; (def read-sub-exp-type
+;;   (grmr/recurse "expected-type"))
 
-(def type-literals {"empty-list" empty-list
-                    "c/empty-list-constraint" c/empty-list-constraint
-                    "c/empty-vect-constraint" c/empty-vect-constraint
-                    "c/list-constraint" c/list-constraint
-                    "c/vect-constraint" c/vect-constraint
-                    "c/seq-constraint" c/seq-constraint
-                    "c/no-symbol" c/no-symbol
-                    "c/no-tail" c/no-tail
-                    "c/no-int" c/no-int
-                    "c/no-string" c/no-string
-                    "c/no-fields" c/no-fields
-                    "c/no-args" c/no-args
-                    "c/variadic" c/variadic
-                    "c/top-type" c/top-type
-                    "c/bottom-type" c/bottom-type
-                    "c/fn-constraint" c/fn-constraint
-                    "c/arity-constraint" c/arity-constraint
-                    "c/int-constraint" c/int-constraint
-                    "c/maybe-constraint" c/maybe-constraint
-                    "c/empty-reified" c/empty-reified
-                    "c/hashmap-constraint" c/hashmap-constraint
-                    "c/bitmap-constraint" c/bitmap-constraint
-                    "c/array-constraint" c/array-constraint
-                    "c/hash-coll-constraint" c/hash-coll-constraint
-                    "c/promise-constraint" c/promise-constraint
-                    "c/future-constraint" c/future-constraint
-                    "c/inner-type-of-op" c/inner-type-of-op
-                    "c/string-constraint" c/string-constraint
-                    "c/strbuff-constraint" c/strbuff-constraint
-                    "c/substr-constraint" c/substr-constraint
-                    "c/empty-fn-constraint" c/empty-fn-constraint
-                    "c/list-from-op" c/list-from-op
-                    "c/vect-from-op" c/vect-from-op
-                    "c/arg-of-op" c/arg-of-op
-                    "c/call-value-op" c/call-value-op
-                    "c/concat-op" c/concat-op
-                    "c/apply-op" c/apply-op
-                    "c/first-of-op" c/first-of-op
-                    "c/last-of-op" c/last-of-op
-                    "c/rest-of-op" c/rest-of-op
-                    "c/butlast-of-op" c/butlast-of-op
-                    ;; "c/get-from-op" c/get-from-op
-                    ;; "c/set-to-op" c/set-to-op
-                    })
+;; (def type-literals {"empty-list" empty-list
+;;                     "c/empty-list-constraint" c/empty-list-constraint
+;;                     "c/empty-vect-constraint" c/empty-vect-constraint
+;;                     "c/list-constraint" c/list-constraint
+;;                     "c/vect-constraint" c/vect-constraint
+;;                     "c/seq-constraint" c/seq-constraint
+;;                     "c/no-symbol" c/no-symbol
+;;                     "c/no-tail" c/no-tail
+;;                     "c/no-int" c/no-int
+;;                     "c/no-string" c/no-string
+;;                     "c/no-fields" c/no-fields
+;;                     "c/no-args" c/no-args
+;;                     "c/variadic" c/variadic
+;;                     "c/top-type" c/top-type
+;;                     "c/bottom-type" c/bottom-type
+;;                     "c/fn-constraint" c/fn-constraint
+;;                     "c/arity-constraint" c/arity-constraint
+;;                     "c/int-constraint" c/int-constraint
+;;                     "c/maybe-constraint" c/maybe-constraint
+;;                     "c/empty-reified" c/empty-reified
+;;                     "c/hashmap-constraint" c/hashmap-constraint
+;;                     "c/bitmap-constraint" c/bitmap-constraint
+;;                     "c/array-constraint" c/array-constraint
+;;                     "c/hash-coll-constraint" c/hash-coll-constraint
+;;                     "c/inner-type-of-op" c/inner-type-of-op
+;;                     "c/string-constraint" c/string-constraint
+;;                     "c/strbuff-constraint" c/strbuff-constraint
+;;                     "c/substr-constraint" c/substr-constraint
+;;                     "c/empty-fn-constraint" c/empty-fn-constraint
+;;                     "c/list-from-op" c/list-from-op
+;;                     "c/vect-from-op" c/vect-from-op
+;;                     "c/arg-of-op" c/arg-of-op
+;;                     "c/call-value-op" c/call-value-op
+;;                     "c/concat-op" c/concat-op
+;;                     "c/apply-op" c/apply-op
+;;                     "c/first-of-op" c/first-of-op
+;;                     "c/last-of-op" c/last-of-op
+;;                     "c/rest-of-op" c/rest-of-op
+;;                     "c/butlast-of-op" c/butlast-of-op
+;;                     ;; "c/get-from-op" c/get-from-op
+;;                     ;; "c/set-to-op" c/set-to-op
+;;                     })
 
-(def read-type-literal
-  (grmr/rule "type-literal"
-             (apply-to (fn [lit-name]
-                         (either (get type-literals lit-name)
-                                 (do
-                                   (print-err "No type literal named" (str "'" lit-name "'")
-                                              "exists.")
-                                   (abort))))
-                       ignore-whitespace
-                       (apply grmr/any (keys type-literals)))))
+;; (def read-type-literal
+;;   (grmr/rule "type-literal"
+;;              (apply-to (fn [lit-name]
+;;                          (either (get type-literals lit-name)
+;;                                  (do
+;;                                    (print-err "No type literal named" (str "'" lit-name "'")
+;;                                               "exists.")
+;;                                    (abort))))
+;;                        ignore-whitespace
+;;                        (apply grmr/any (keys type-literals)))))
 
-(def type-constraints {"c/AllValues" c/AllValues
-                       "c/NoValues" c/NoValues
-                       "c/FnConstraint" c/FnConstraint
-                       "c/fn-c " c/fn-c
-                       "c/fn-arity" c/fn-arity
-                       "c/seq-c" c/seq-c
-                       "c/vec-c" c/vect-c
-                       "c/list-c " c/list-c
-                       "c/param " c/param
-                       "c/tag" c/tag
-                       "c/ParamConstraint" c/ParamConstraint
-                       "c/MaybeConstraint" c/MaybeConstraint
-                       "c/IntConstraint" c/IntConstraint
-                       "c/TypeOfConstraint" c/TypeOfConstraint
-                       "c/SymbolConstraint" c/SymbolConstraint
-                       "c/StrBuffConstraint" c/StrBuffConstraint
-                       "c/SubStrConstraint" c/SubStrConstraint
-                       "c/hashmap-c " c/hashmap-c
-                       "c/vect-c " c/vect-c
-                       "c/AgentConstraint" c/AgentConstraint
-                       "c/FutureConstraint" c/FutureConstraint
-                       "c/OpaqueConstraint" c/OpaqueConstraint
-                       "c/PromiseConstraint" c/PromiseConstraint
-                       "c/ReifiedConstraint" c/ReifiedConstraint
-                       "c/SumConstraint" c/SumConstraint
-                       "c/ProtoImpls" c/ProtoImpls
-                       "c/sum-c" c/sum-c
-                       "c/multi" c/multi
-                       "c/CollectionOf" c/CollectionOf
-                       "c/coll-of-c" c/coll-of-c
-                       "c/TypeOp" c/TypeOp
-                       "c/type-op" c/type-op
-                       "c/fn-arity" c/fn-arity
-                       "c/intersect" c/intersect
-                       "c/reify-type-constraint" c/reify-type-constraint
-                       ".required-arities" .required-arities
-                       "c/Location" c/Location
-                       "symbol" symbol
-                       "c/do-call-value" c/do-call-value
-                       "=" =
-                       })
+;; (def type-constraints {"c/AllValues" c/AllValues
+;;                        "c/NoValues" c/NoValues
+;;                        "c/FnConstraint" c/FnConstraint
+;;                        "c/fn-c " c/fn-c
+;;                        "c/fn-arity" c/fn-arity
+;;                        "c/seq-c" c/seq-c
+;;                        "c/vec-c" c/vect-c
+;;                        "c/list-c " c/list-c
+;;                        "c/param " c/param
+;;                        "c/tag" c/tag
+;;                        "c/ParamConstraint" c/ParamConstraint
+;;                        "c/MaybeConstraint" c/MaybeConstraint
+;;                        "c/IntConstraint" c/IntConstraint
+;;                        "c/TypeOfConstraint" c/TypeOfConstraint
+;;                        "c/SymbolConstraint" c/SymbolConstraint
+;;                        "c/StrBuffConstraint" c/StrBuffConstraint
+;;                        "c/SubStrConstraint" c/SubStrConstraint
+;;                        "c/hashmap-c " c/hashmap-c
+;;                        "c/vect-c " c/vect-c
+;;                        "c/AgentConstraint" c/AgentConstraint
+;;                        "c/OpaqueConstraint" c/OpaqueConstraint
+;;                        "c/ReifiedConstraint" c/ReifiedConstraint
+;;                        "c/SumConstraint" c/SumConstraint
+;;                        "c/ProtoImpls" c/ProtoImpls
+;;                        "c/sum-c" c/sum-c
+;;                        "c/multi" c/multi
+;;                        "c/CollectionOf" c/CollectionOf
+;;                        "c/coll-of-c" c/coll-of-c
+;;                        "c/TypeOp" c/TypeOp
+;;                        "c/type-op" c/type-op
+;;                        "c/fn-arity" c/fn-arity
+;;                        "c/intersect" c/intersect
+;;                        "c/reify-type-constraint" c/reify-type-constraint
+;;                        ".required-arities" .required-arities
+;;                        "c/Location" c/Location
+;;                        "symbol" symbol
+;;                        "c/do-call-value" c/do-call-value
+;;                        "=" =
+;;                        })
 
-(def read-type-constraint
-  (grmr/rule "type-constraint"
-             (apply-to (fn [constraint-name args]
-                         (either (map (get type-constraints constraint-name)
-                                      (fn [f]
-                                        (apply f args)))
-                                 (do
-                                   (print-err "No constraint named" (str "'" constraint-name "'")
-                                              "exists.")
-                                   (abort))))
-                       read-open-paren
-                       ignore-whitespace
-                       (apply grmr/any (keys type-constraints))
-                       (grmr/one-or-more (apply-to identity
-                                                   ignore-whitespace
-                                                   (grmr/any read-sub-exp-type
-                                                             (apply-to .q-val
-                                                                       read-quoted)
-                                                             read-string
-                                                             read-integer)))
-                       read-close-paren)))
+;; (def read-type-constraint
+;;   (grmr/rule "type-constraint"
+;;              (apply-to (fn [constraint-name args]
+;;                          (either (map (get type-constraints constraint-name)
+;;                                       (fn [f]
+;;                                         (apply f args)))
+;;                                  (do
+;;                                    (print-err "No constraint named" (str "'" constraint-name "'")
+;;                                               "exists.")
+;;                                    (abort))))
+;;                        read-open-paren
+;;                        ignore-whitespace
+;;                        (apply grmr/any (keys type-constraints))
+;;                        (grmr/one-or-more (apply-to identity
+;;                                                    ignore-whitespace
+;;                                                    (grmr/any read-sub-exp-type
+;;                                                              (apply-to .q-val
+;;                                                                        read-quoted)
+;;                                                              read-string
+;;                                                              read-integer)))
+;;                        read-close-paren)))
 
-(def read-arity-map
-  (grmr/rule "arity-map"
-             (apply-to identity
-                       (grmr/ignore "{")
-                       (apply-to (fn [elems]
-                                   (reduce elems {} (fn [m [k v]]
-                                                      (assoc m k v))))
-                                 (grmr/none-or-more (grmr/all ignore-whitespace
-                                                              (grmr/any read-integer
-                                                                        (apply-to .q-val
-                                                                                  read-quoted)
-                                                                        read-type-literal)
-                                                              (grmr/any read-integer
-                                                                        (apply-to .q-val
-                                                                                  read-quoted)
-                                                                        read-type-literal
-                                                                        read-type-constraint)))
-                                 ignore-whitespace
-                                 (grmr/any (grmr/ignore "}")
-                                           (grmr/error "Missing \"}\"."))))))
+;; (def read-arity-map
+;;   (grmr/rule "arity-map"
+;;              (apply-to identity
+;;                        (grmr/ignore "{")
+;;                        (apply-to (fn [elems]
+;;                                    (reduce elems {} (fn [m [k v]]
+;;                                                       (assoc m k v))))
+;;                                  (grmr/none-or-more (grmr/all ignore-whitespace
+;;                                                               (grmr/any read-integer
+;;                                                                         (apply-to .q-val
+;;                                                                                   read-quoted)
+;;                                                                         read-type-literal)
+;;                                                               (grmr/any read-integer
+;;                                                                         (apply-to .q-val
+;;                                                                                   read-quoted)
+;;                                                                         read-type-literal
+;;                                                                         read-type-constraint)))
+;;                                  ignore-whitespace
+;;                                  (grmr/any (grmr/ignore "}")
+;;                                            (grmr/error "Missing \"}\"."))))))
 
-(def read-expected-type
-  (grmr/rule read-sub-exp-type
-             (grmr/any read-type-literal
-                       read-integer
-                       read-string
-                       read-arity-map
-                       (apply-to identity
-                                 (grmr/ignore "[")
-                                 (grmr/none-or-more (apply-to identity
-                                                              ignore-whitespace
-                                                              read-sub-exp-type))
-                                 read-close-bracket)
-                       (apply-to .q-val
-                                 read-quoted)
-                       read-type-constraint)))
+;; (def read-expected-type
+;;   (grmr/rule read-sub-exp-type
+;;              (grmr/any read-type-literal
+;;                        read-integer
+;;                        read-string
+;;                        read-arity-map
+;;                        (apply-to identity
+;;                                  (grmr/ignore "[")
+;;                                  (grmr/none-or-more (apply-to identity
+;;                                                               ignore-whitespace
+;;                                                               read-sub-exp-type))
+;;                                  read-close-bracket)
+;;                        (apply-to .q-val
+;;                                  read-quoted)
+;;                        read-type-constraint)))
 
-(def read-is-type
-  (grmr/rule "is-type"
-             (apply-to (fn [file line type-expr expr]
-                         (ast/IsType type-expr expr))
-                       read-open-paren
-                       ignore-whitespace
-                       (grmr/ignore "is-type")
-                       (grmr/get-value 'file-name)
-                       (grmr/get-value 'line-number)
-                       ignore-whitespace
-                       (grmr/any (apply-to (fn [proto-sym type-sym]
-                                             (ast/GetImpl proto-sym type-sym c/top-type))
-                                           (grmr/ignore "(#impl")
-                                           ignore-whitespace
-                                           read-symbol
-                                           ignore-whitespace
-                                           (grmr/optional read-symbol c/no-symbol)
-                                           read-close-paren)
-                                 read-expr)
-                       read-expected-type
-                       read-close-paren)))
+;; (def read-is-type
+;;   (grmr/rule "is-type"
+;;              (apply-to (fn [file line type-expr expr]
+;;                          (ast/IsType type-expr expr))
+;;                        read-open-paren
+;;                        ignore-whitespace
+;;                        (grmr/ignore "is-type")
+;;                        (grmr/get-value 'file-name)
+;;                        (grmr/get-value 'line-number)
+;;                        ignore-whitespace
+;;                        (grmr/any (apply-to (fn [proto-sym type-sym]
+;;                                              (ast/GetImpl proto-sym type-sym c/top-type))
+;;                                            (grmr/ignore "(#impl")
+;;                                            ignore-whitespace
+;;                                            read-symbol
+;;                                            ignore-whitespace
+;;                                            (grmr/optional read-symbol c/no-symbol)
+;;                                            read-close-paren)
+;;                                  read-expr)
+;;                        read-expected-type
+;;                        read-close-paren)))
 
-(def read-show-type
-  (grmr/rule "show-type"
-             (apply-to (fn [loc expr]
-                         (ast/call-expr [(c/tag "show-type" loc) expr]))
-                       read-open-paren
-                       ignore-whitespace
-                       (grmr/ignore "show-type")
-                       (apply-to c/Location
-                                 (grmr/get-value 'file-name)
-                                 (grmr/get-value 'line-number))
-                       ignore-whitespace
-                       read-sub-expr
-                       read-close-paren)))
+;; (def read-show-type
+;;   (grmr/rule "show-type"
+;;              (apply-to (fn [loc expr]
+;;                          (ast/call-expr [(c/tag "show-type" loc) expr]))
+;;                        read-open-paren
+;;                        ignore-whitespace
+;;                        (grmr/ignore "show-type")
+;;                        (apply-to c/Location
+;;                                  (grmr/get-value 'file-name)
+;;                                  (grmr/get-value 'line-number))
+;;                        ignore-whitespace
+;;                        read-sub-expr
+;;                        read-close-paren)))
 
 (def read-main
   (grmr/rule "main"
