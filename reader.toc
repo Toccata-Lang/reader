@@ -11,11 +11,11 @@
 ;; The different types of nodes in the AST
 (add-ns ast (git-dependency "https://github.com/Toccata-Lang/ast.git"
                             "ast.toc"
-                            :sha "03f9bad"))
+                            :sha "e7a0dcf"))
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
-                          :sha "5dd788f"))
+                          :sha "c33aaf6"))
 
 (def lflf "\n\n")
 
@@ -469,20 +469,20 @@
                        read-integer-literal
                        read-close-paren)))
 
-(def read-required-arities
-  (grmr/rule "required-arities"
-             (apply-to (fn [file line arg-counts]
-                         ;; ! (vector-of Integer) arg-counts
-                         (-> (.required-arities c/fn-constraint arg-counts)
-                             (c/update-path (c/Location file line))))
-                       read-open-paren
-                       ignore-whitespace
-                       (grmr/ignore "required-arities")
-                       (grmr/get-value 'file-name)
-                       (grmr/get-value 'line-number)
-                       ignore-whitespace
-                       (grmr/one-or-more read-integer)
-                       read-close-paren)))
+;; (def read-required-arities
+;;   (grmr/rule "required-arities"
+;;              (apply-to (fn [file line arg-counts]
+;;                          ;; ! (vector-of Integer) arg-counts
+;;                          (-> (.required-arities c/fn-constraint arg-counts)
+;;                              (c/update-path (c/Location file line))))
+;;                        read-open-paren
+;;                        ignore-whitespace
+;;                        (grmr/ignore "required-arities")
+;;                        (grmr/get-value 'file-name)
+;;                        (grmr/get-value 'line-number)
+;;                        ignore-whitespace
+;;                        (grmr/one-or-more read-integer)
+;;                        read-close-paren)))
 
 (defn assert-map-of [key-type val-type]
   (assert (instance? c/ValueConstraint key-type))
@@ -561,9 +561,9 @@
    ;;                             (c/CollectionOf contents empty-list c/no-symbol "")))
    "sequence-of" (fn [contents]
                    (c/seq-c [] (c/coll-of-c contents)))
-   "function-returns" (fn [contents]
-                        (c/intersect c/fn-constraint
-                                     (c/CollectionOf contents empty-list c/no-symbol)))
+   ;; "function-returns" (fn [contents]
+   ;;                      (c/intersect c/fn-arity
+   ;;                                   (c/CollectionOf contents empty-list c/no-symbol)))
    })
 
 (def read-generic-type
@@ -739,7 +739,7 @@
                        read-type-of-result-type
                        read-type-of-fn-call
                        read-type-of-fn-apply
-                       read-required-arities
+                       ;; read-required-arities
                        read-type-of-type
                        read-min-count-assertion
                        read-min-val-assertion
@@ -1381,22 +1381,22 @@
                                  read-block-comment)
                        ignore-whitespace)))
 
-(def read-prototype
-  (grmr/rule "prototype"
-             (grmr/any read-assert
-                       (apply-to identity
-                                 read-open-paren
-                                 (grmr/any
-                                  (apply-to ast/prototype
-                                            (grmr/any read-symbol
-                                                      (grmr/error "Every prototype function must"
-                                                                  "have a unique name."))
-                                            read-list-destructure
-                                            read-fn-doc
-                                            (grmr/any read-inline-body
-                                                      (grmr/none-or-more read-expr))
-                                            read-close-paren)
-                                  (grmr/error "Invalid prototype function."))))))
+(def read-defp
+  (grmr/rule "defp"
+             (apply-to identity
+                       read-open-paren
+                       (grmr/ignore "defp")
+                       (grmr/ignore (grmr/one-or-more whitespace))
+                       (grmr/any
+                        (apply-to ast/prototype
+                                  (grmr/any read-symbol
+                                            (grmr/error "Every prototype function must"
+                                                        "have a unique name."))
+                                  read-list-destructure
+                                  read-fn-doc
+                                  (grmr/none-or-more read-expr)
+                                  read-close-paren)
+                        (grmr/error "Invalid prototype function.")))))
 
 (def read-defn
   (grmr/rule "defn"
@@ -1442,7 +1442,7 @@
                                                                           read-type-of-result-type
                                                                           read-type-of-fn-call
                                                                           read-type-of-fn-apply
-                                                                          read-required-arities
+                                                                          ;; read-required-arities
                                                                           read-type-of-type
                                                                           read-min-count-assertion
                                                                           read-min-val-assertion
@@ -1727,6 +1727,7 @@
                        ignore-whitespace
                        ;; (grmr/catch-error output-error)
                        (grmr/any read-defn
+                                 read-defp
                                  read-def
                                  read-deftype
                                  read-extend-type
