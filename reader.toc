@@ -11,7 +11,7 @@
 ;; The different types of nodes in the AST
 (add-ns ast (git-dependency "https://github.com/Toccata-Lang/ast.git"
                             "ast.toc"
-                            :sha "622fa83"))
+                            :sha "c3d187f"))
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
@@ -1398,35 +1398,6 @@
                                             read-close-paren)
                                   (grmr/error "Invalid prototype function."))))))
 
-(def read-defprotocol
-  (grmr/rule "defprotocol"
-             (apply-to identity
-                       read-open-paren
-                       (grmr/ignore "defprotocol")
-                       (grmr/ignore (grmr/one-or-more whitespace))
-                       (grmr/any (apply-to
-                                  (fn [sym prototypes]
-                                    (ast/protocol
-                                     sym (remove prototypes (partial instance? ast/NoCode))))
-                                  (grmr/any read-symbol
-                                            (grmr/error "'defprotocol' must be followed by"
-                                                        "the name of the protocol."))
-                                  ;; TODO: much too complex. should be
-                                  ;; (grmr/none-or-more read-prototype)
-                                  ;; but this gives better error messages
-                                  (apply-to (fn [comms protos]
-                                              (comp* comms (seq protos)))
-                                            (grmr/none-or-more read-block-comment)
-                                            (grmr/all (grmr/any (grmr/one-or-more read-prototype)
-                                                                (grmr/error "A protocol definition must"
-                                                                            "contain at least one prototype"
-                                                                            "function defintion."))
-                                                      (grmr/none-or-more
-                                                       (grmr/any read-prototype
-                                                                 read-block-comment))))
-                                  read-close-paren)
-                                 (grmr/error "Invalid 'defprotocol' expression.")))))
-
 (def read-defn
   (grmr/rule "defn"
              (apply-to identity
@@ -1757,7 +1728,6 @@
                        ;; (grmr/catch-error output-error)
                        (grmr/any read-defn
                                  read-def
-                                 read-defprotocol
                                  read-deftype
                                  read-extend-type
                                  read-block-comment
