@@ -908,16 +908,6 @@
                         read-block-comment
                         read-implementation))))
 
-(def read-reify
-  (grmr/rule "reify"
-             (apply-to (fn [impls]
-                         (ast/reified c/no-int impls))
-                       read-open-paren
-                       (grmr/ignore "reify")
-                       (grmr/ignore (grmr/one-or-more whitespace))
-                       read-proto-impls
-                       read-close-paren)))
-
 (def curr-file-name
   (grmr/rule "_FILE_"
              (apply-to (fn [file-name line-num]
@@ -1367,7 +1357,6 @@
                                  read-let
                                  read-do
                                  ;; read-apply-to
-                                 read-reify
                                  read-vector
                                  read-hash-map
                                  read-hash-set
