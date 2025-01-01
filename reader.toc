@@ -11,11 +11,11 @@
 ;; The different types of nodes in the AST
 (add-ns ast (git-dependency "https://github.com/Toccata-Lang/ast.git"
                             "ast.toc"
-                            :sha "2d4c9c7"))
+                            :sha "752db6e"))
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
-                          :sha "65cd0ac"))
+                          :sha "f8bb466"))
 
 (def lflf "\n\n")
 
@@ -721,9 +721,7 @@
   (grmr/rule "singleton"
              (apply-to identity
                        ignore-whitespace
-                       (grmr/any (apply-to (fn [s]
-                                             (c/sum-c [(c/SubStrConstraint s empty-list c/no-symbol)
-                                                       (c/StrConstraint s)]))
+                       (grmr/any (apply-to c/StrConstraint
                                            read-string)))))
 
 (def read-type-expr
@@ -1468,7 +1466,8 @@
                          (ast/type-ast sym fields impls))
                        ignore-whitespace
                        read-symbol
-                       read-list-destructure
+                       (grmr/any read-list-destructure
+                                 (grmr/always (ast/params [])))
                        read-proto-impls)))
 
 (def read-deftype
@@ -1476,15 +1475,7 @@
              (apply-to identity
                        read-open-paren
                        (grmr/ignore "deftype")
-                       (grmr/any (apply-to (fn [sym type-c]
-                                             (ast/definition sym [type-c]))
-                                           (grmr/ignore
-                                            (grmr/one-or-more whitespace))
-                                           (grmr/any read-symbol
-                                                     (grmr/error "'deftype' must be followed by a"
-                                                                 "type name."))
-                                           read-type-expr)
-                                 (apply-to (fn [sym type-constructors]
+                       (grmr/any (apply-to (fn [sym type-constructors]
                                              (ast/rec-type-ast sym type-constructors))
                                            (grmr/ignore (grmr/one-or-more whitespace))
                                            (grmr/any read-symbol
