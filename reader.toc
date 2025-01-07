@@ -1114,26 +1114,26 @@
 ;;                        (grmr/ignore (grmr/one-or-more whitespace))
 ;;                        read-sub-expr)))
 
-(def read-for-let
-  (grmr/rule "for-let"
-             (apply-to identity
-                       ignore-whitespace
-                       (grmr/ignore ":let")
-                       (grmr/ignore (grmr/one-or-more whitespace))
-                       read-open-bracket
-                       (grmr/one-or-more read-let-binding)
-                       read-close-bracket
-                       ignore-whitespace)))
+;; (def read-for-let
+;;   (grmr/rule "for-let"
+;;              (apply-to identity
+;;                        ignore-whitespace
+;;                        (grmr/ignore ":let")
+;;                        (grmr/ignore (grmr/one-or-more whitespace))
+;;                        read-open-bracket
+;;                        (grmr/one-or-more read-let-binding)
+;;                        read-close-bracket
+;;                        ignore-whitespace)))
 
-(def read-for-binding
-  (grmr/rule "for-binding"
-             (grmr/any read-for-let
-                       ;; read-for-when
-                       ;; read-for-when-not
-                       read-let-binding
-                       (apply-to identity
-                                 read-block-comment
-                                 ignore-whitespace))))
+;; (def read-for-binding
+;;   (grmr/rule "for-binding"
+;;              (grmr/any read-for-let
+;;                        ;; read-for-when
+;;                        ;; read-for-when-not
+;;                        read-let-binding
+;;                        (apply-to identity
+;;                                  read-block-comment
+;;                                  ignore-whitespace))))
 
 ;; (defn nest-for-exprs [fst rst body]
 ;;   (assert (instance? ast/binding-ast fst))
