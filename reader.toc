@@ -11,7 +11,7 @@
 ;; The different types of nodes in the AST
 (add-ns ast (git-dependency "https://github.com/Toccata-Lang/ast.git"
                             "ast.toc"
-                            :sha "f6bb5e6"))
+                            :sha "3f6549e"))
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
@@ -960,91 +960,6 @@
                                  (grmr/any (grmr/ignore "}")
                                            (grmr/error "Missing \"}\"."))))))
 
-(defprotocol QuoteLiteral
-  (quote-literal [quoted]
-    (ast/quoted quoted)))
-
-(extend-type ast/string-ast
-  QuoteLiteral
-  (quote-literal [n] n))
-
-(extend-type ast/integer-ast
-  QuoteLiteral
-  (quote-literal [n] n))
-
-(extend-type String
-  QuoteLiteral
-  (quote-literal [n] n))
-
-(extend-type Integer
-  QuoteLiteral
-  (quote-literal [n] n))
-
-(extend-type List
-  QuoteLiteral
-  (quote-literal [quoted-list]
-    (either (or (for [head (first quoted-list)
-                      :when (= head 'quoted)
-                      ast (quote-literal (rest quoted-list))]
-                  ast)
-                (for [coll-builder (first quoted-list)
-                      :when (or (= coll-builder 'hash-map)
-                                (= coll-builder 'vector))
-                      :let [frms (rest quoted-list)]
-                      contents (or (empty? frms)
-                                   (maybe (map frms quote-literal)))]
-                  (ast/call-ast (c/tag 'vector (ast/location quoted-list))
-                                (vec contents)
-                                "" c/top-type)))
-            (ast/call-ast (c/tag 'list (ast/location quoted-list))
-                          (vec (map quoted-list quote-literal))
-                          "" c/top-type))))
-
-(extend-type Vector
-  QuoteLiteral
-  (quote-literal [quoted-vect]
-    (either (or (for [head (first quoted-vect)
-                      :when (= head 'quoted)
-                      ast (quote-literal (rest quoted-vect))]
-                  ast)
-                (for [coll-builder (first quoted-vect)
-                      :when (or (= coll-builder 'hash-map)
-                                (= coll-builder 'vector))
-                      :let [frms (rest quoted-vect)]
-                      contents (or (empty? frms)
-                                   (maybe (map frms quote-literal)))]
-                  (ast/call-ast (c/tag 'vector (ast/location quoted-vect))
-                                contents "" c/top-type)))
-            (ast/call-ast (c/tag 'list (ast/location quoted-vect))
-                          (map quoted-vect quote-literal)
-                          "" c/top-type))))
-
-(def quoted-value (grmr/recurse "quoted-value"))
-
-(def read-quoted-value
-  (grmr/rule quoted-value
-             (apply-to identity
-                       ignore-whitespace
-                       (grmr/any (apply-to identity
-                                           read-open-paren
-                                           (grmr/none-or-more quoted-value)
-                                           read-close-paren)
-                                 (apply-to (fn [xs]
-                                             (cons 'vector (seq xs)))
-                                           (grmr/ignore "[")
-                                           (grmr/one-or-more quoted-value)
-                                           read-close-bracket)
-                                 read-integer-literal
-                                 read-string-literal
-                                 read-symbol)
-                       ignore-whitespace)))
-
-(def read-quoted
-  (grmr/rule "quoted"
-             (apply-to quote-literal
-                       (grmr/ignore "'")
-                       read-quoted-value)))
-
 (defn nest-thread-exprs [first-expr exprs]
   (let [[first-expr & exprs] (remove (cons first-expr (seq exprs))
                                      (partial instance? ast/NoCode))]
@@ -1311,7 +1226,6 @@
                                  curr-file-name
                                  curr-line
                                  read-symbol
-                                 read-quoted
                                  read-or
                                  read-and
                                  read-fn
