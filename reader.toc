@@ -11,11 +11,11 @@
 ;; The different types of nodes in the AST
 (add-ns ast (git-dependency "https://github.com/Toccata-Lang/ast.git"
                             "ast.toc"
-                            :sha "c476894"))
+                            :sha "f6bb5e6"))
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
-                          :sha "bb97351"))
+                          :sha "ff96b0c"))
 
 (def lflf "\n\n")
 
@@ -546,19 +546,12 @@
 (def generic-assertions
   {"contains" (fn [contents]
                 (c/CollectionOf contents empty-list c/no-symbol))
-   "maybe-of" (fn [contents]
-                (c/intersect c/maybe-constraint
-                             (c/CollectionOf contents empty-list c/no-symbol)))
    "set-of" (fn [contents]
               (c/intersect c/set-constraint
                            (c/CollectionOf contents empty-list c/no-symbol)))
    "agent-of" (fn [contents]
                 (c/intersect c/agent-constraint
                              (c/CollectionOf contents empty-list c/no-symbol)))
-   ;; almost certainly can't use this
-   ;; "promise-of" (fn [contents]
-   ;;                (c/intersect c/promise-constraint
-   ;;                             (c/CollectionOf contents empty-list c/no-symbol "")))
    "sequence-of" (fn [contents]
                    (c/seq-c [] (c/coll-of-c contents)))
    ;; "function-returns" (fn [contents]
@@ -1052,17 +1045,6 @@
                        (grmr/ignore "'")
                        read-quoted-value)))
 
-(def read-either
-  (grmr/rule "either"
-             (apply-to ast/either-expr
-                       read-open-paren
-                       (grmr/ignore "either")
-                       (grmr/ignore (grmr/one-or-more whitespace))
-                       read-sub-expr
-                       (grmr/any read-sub-expr
-                                 (grmr/error "Missing 'either' clause."))
-                       read-close-paren)))
-
 (defn nest-thread-exprs [first-expr exprs]
   (let [[first-expr & exprs] (remove (cons first-expr (seq exprs))
                                      (partial instance? ast/NoCode))]
@@ -1187,52 +1169,35 @@
                                  (grmr/error "An 'and' expression must contain at least one clause."))
                        read-close-paren)))
 
-(def read-cond-val
-  (grmr/rule "cond-value"
-             (apply-to ast/cond-val-expr
-                       read-sub-expr
-                       read-sub-expr)))
-
-(def read-cond
-  (grmr/rule "cond"
-             (apply-to ast/cond-expr
-                       read-open-paren
-                       (grmr/ignore "cond")
-                       (grmr/ignore (grmr/one-or-more whitespace))
-                       (grmr/one-or-more read-cond-val)
-                       (grmr/any read-sub-expr
-                                 (grmr/error "Missing 'cond' default clause."))
-                       read-close-paren)))
-
 (def wrapper-sym (c/tag "#wrapper"))
 
-(def read-for-when
-  (grmr/rule "for-when"
-             (apply-to (fn [fn ln clause]
-                         (ast/cond-ast clause (ast/block-comment fn ln [])
-                                       (ast/call-ast (c/tag 'zero (c/Location fn ln))
-                                                     [wrapper-sym] "" c/top-type)
-                                       "" c/top-type))
-                       (grmr/get-value 'file-name)
-                       (grmr/get-value 'line-number)
-                       ignore-whitespace
-                       (grmr/ignore ":when")
-                       (grmr/ignore (grmr/one-or-more whitespace))
-                       read-sub-expr)))
+;; (def read-for-when
+;;   (grmr/rule "for-when"
+;;              (apply-to (fn [fn ln clause]
+;;                          (ast/cond-ast clause (ast/block-comment fn ln [])
+;;                                        (ast/call-ast (c/tag 'zero (c/Location fn ln))
+;;                                                      [wrapper-sym] "" c/top-type)
+;;                                        "" c/top-type))
+;;                        (grmr/get-value 'file-name)
+;;                        (grmr/get-value 'line-number)
+;;                        ignore-whitespace
+;;                        (grmr/ignore ":when")
+;;                        (grmr/ignore (grmr/one-or-more whitespace))
+;;                        read-sub-expr)))
 
-(def read-for-when-not
-  (grmr/rule "for-when-not"
-             (apply-to (fn [fn ln clause]
-                         (ast/cond-ast clause (ast/call-ast (c/tag 'zero (c/Location fn ln))
-                                                            [wrapper-sym] "" c/top-type)
-                                       (ast/block-comment fn ln [])
-                                       "" c/top-type))
-                       (grmr/get-value 'file-name)
-                       (grmr/get-value 'line-number)
-                       ignore-whitespace
-                       (grmr/ignore ":when-not")
-                       (grmr/ignore (grmr/one-or-more whitespace))
-                       read-sub-expr)))
+;; (def read-for-when-not
+;;   (grmr/rule "for-when-not"
+;;              (apply-to (fn [fn ln clause]
+;;                          (ast/cond-ast clause (ast/call-ast (c/tag 'zero (c/Location fn ln))
+;;                                                             [wrapper-sym] "" c/top-type)
+;;                                        (ast/block-comment fn ln [])
+;;                                        "" c/top-type))
+;;                        (grmr/get-value 'file-name)
+;;                        (grmr/get-value 'line-number)
+;;                        ignore-whitespace
+;;                        (grmr/ignore ":when-not")
+;;                        (grmr/ignore (grmr/one-or-more whitespace))
+;;                        read-sub-expr)))
 
 (def read-for-let
   (grmr/rule "for-let"
@@ -1248,94 +1213,94 @@
 (def read-for-binding
   (grmr/rule "for-binding"
              (grmr/any read-for-let
-                       read-for-when
-                       read-for-when-not
+                       ;; read-for-when
+                       ;; read-for-when-not
                        read-let-binding
                        (apply-to identity
                                  read-block-comment
                                  ignore-whitespace))))
 
-(defn nest-for-exprs [fst rst body]
-  (assert (instance? ast/binding-ast fst))
-  (assert (instance? (vector-of (any-of ast/binding-ast
-                                        ast/cond-ast
-                                        Vector))
-                     rst))
-  (cond (empty? rst)
-        (ast/call-ast (c/tag 'map (ast/location fst))
-                      [(.val fst)
-                       (ast/fn-arity
-                        (ast/params [(.binding fst)])
-                        "" [body])]
-                      "" c/top-type)
+;; (defn nest-for-exprs [fst rst body]
+;;   (assert (instance? ast/binding-ast fst))
+;;   (assert (instance? (vector-of (any-of ast/binding-ast
+;;                                         ;; ast/cond-ast
+;;                                         Vector))
+;;                      rst))
+;;   (cond (empty? rst)
+;;         (ast/call-ast (c/tag 'map (ast/location fst))
+;;                       [(.val fst)
+;;                        (ast/fn-arity
+;;                         (ast/params [(.binding fst)])
+;;                         "" [body])]
+;;                       "" c/top-type)
         
-        (let [[cont] (-> (reverse rst)
-                         (reduce [body (maybe nothing)]
-                                 (fn [[cont map?] expr]
-                                   (cond (instance? Vector expr)
-                                         [(ast/cond-expr expr cont) map?]
+;;         (let [[cont] (-> (reverse rst)
+;;                          (reduce [body (maybe nothing)]
+;;                                  (fn [[cont map?] expr]
+;;                                    (cond (instance? Vector expr)
+;;                                          [(ast/cond-expr expr cont) map?]
 
-                                         (instance? ast/binding-ast expr)
-                                         [(ast/call-ast (cond map?
-                                                              (c/tag 'map (ast/location expr))
-                                                              (c/tag 'flat-map (ast/location expr)))
-                                                        [(.val expr)
-                                                         (ast/fn-arity
-                                                          (ast/params [(.binding expr)])
-                                                          "" [cont])]
-                                                        "" c/top-type)
-                                          nothing]
+;;                                          (instance? ast/binding-ast expr)
+;;                                          [(ast/call-ast (cond map?
+;;                                                               (c/tag 'map (ast/location expr))
+;;                                                               (c/tag 'flat-map (ast/location expr)))
+;;                                                         [(.val expr)
+;;                                                          (ast/fn-arity
+;;                                                           (ast/params [(.binding expr)])
+;;                                                           "" [cont])]
+;;                                                         "" c/top-type)
+;;                                           nothing]
 
-                                         (instance? ast/cond-ast expr)
-                                         [(cond (instance? ast/block-comment-ast (.value expr))
-                                                (.value expr cont)
-                                                (.cont expr cont))
-                                          map?]
+;;                                          ;; (instance? ast/cond-ast expr)
+;;                                          ;; [(cond (instance? ast/block-comment-ast (.value expr))
+;;                                          ;;        (.value expr cont)
+;;                                          ;;        (.cont expr cont))
+;;                                          ;;  map?]
 
-                                         (do
-                                           (print-err "Parser error" _FILE_ _LINE_)
-                                           (abort))))))
-              wrapper (c/tag (gensym "wrap") (ast/location fst))]
-          (ast/binding-ast wrapper (.val fst)
-                           [(ast/call-ast (c/tag 'flat-map (ast/location fst))
-                                           [wrapper
-                                            (ast/fn-arity
-                                             (ast/params [(.binding fst)])
-                                             ""
-                                             [(cata (fn [x]
-                                                      (cond (= x wrapper-sym)
-                                                            wrapper
-                                                            x))
-                                                    cont)])]
-                                           "" c/top-type)]
-                           ""
-                           c/top-type))))
+;;                                          (do
+;;                                            (print-err "Parser error" _FILE_ _LINE_)
+;;                                            (abort))))))
+;;               wrapper (c/tag (gensym "wrap") (ast/location fst))]
+;;           (ast/binding-ast wrapper (.val fst)
+;;                            [(ast/call-ast (c/tag 'flat-map (ast/location fst))
+;;                                            [wrapper
+;;                                             (ast/fn-arity
+;;                                              (ast/params [(.binding fst)])
+;;                                              ""
+;;                                              [(cata (fn [x]
+;;                                                       (cond (= x wrapper-sym)
+;;                                                             wrapper
+;;                                                             x))
+;;                                                     cont)])]
+;;                                            "" c/top-type)]
+;;                            ""
+;;                            c/top-type))))
 
-(def read-for
-  (grmr/rule "for"
-             (apply-to identity
-                       read-open-paren
-                       (grmr/ignore "for")
-                       (grmr/ignore (grmr/one-or-more whitespace))
-                       (grmr/any (apply-to nest-for-exprs
-                                           read-open-bracket
-                                           (grmr/any read-let-binding
-                                                     (grmr/error "Invalid initial 'for' binding."))
-                                           (grmr/any (grmr/none-or-more read-for-binding)
-                                                     (grmr/error "Invalid 'for' bindings."))
-                                           read-close-bracket
-                                           (grmr/any (grmr/any read-sub-expr
-                                                               (grmr/error "The body of a 'for' expression"
-                                                                           " must have a single"
-                                                                           " expression in it."))
-                                                     (grmr/error "Invalid 'for' body.")))
-                                 (grmr/error "Invalid 'for' expression."))
-                       (grmr/any (grmr/ignore
-                                  (grmr/all read-sub-expr
-                                            (grmr/error "The body of a 'for'"
-                                                        "expression may only have"
-                                                        "one expression in it.")))
-                                 read-close-paren))))
+;; (def read-for
+;;   (grmr/rule "for"
+;;              (apply-to identity
+;;                        read-open-paren
+;;                        (grmr/ignore "for")
+;;                        (grmr/ignore (grmr/one-or-more whitespace))
+;;                        (grmr/any (apply-to nest-for-exprs
+;;                                            read-open-bracket
+;;                                            (grmr/any read-let-binding
+;;                                                      (grmr/error "Invalid initial 'for' binding."))
+;;                                            (grmr/any (grmr/none-or-more read-for-binding)
+;;                                                      (grmr/error "Invalid 'for' bindings."))
+;;                                            read-close-bracket
+;;                                            (grmr/any (grmr/any read-sub-expr
+;;                                                                (grmr/error "The body of a 'for' expression"
+;;                                                                            " must have a single"
+;;                                                                            " expression in it."))
+;;                                                      (grmr/error "Invalid 'for' body.")))
+;;                                  (grmr/error "Invalid 'for' expression."))
+;;                        (grmr/any (grmr/ignore
+;;                                   (grmr/all read-sub-expr
+;;                                             (grmr/error "The body of a 'for'"
+;;                                                         "expression may only have"
+;;                                                         "one expression in it.")))
+;;                                  read-close-paren))))
 
 (def read-expr
   (grmr/rule read-sub-expr
@@ -1349,8 +1314,6 @@
                                  read-quoted
                                  read-or
                                  read-and
-                                 read-either
-                                 read-cond
                                  read-fn
                                  read-let
                                  read-do
@@ -1358,7 +1321,7 @@
                                  read-vector
                                  read-hash-map
                                  read-hash-set
-                                 read-for
+                                 ;; read-for
                                  read-threading
                                  read-assert
                                  read-assert-result
