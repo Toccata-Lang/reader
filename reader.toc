@@ -11,7 +11,7 @@
 ;; The different types of nodes in the AST
 (add-ns ast (git-dependency "https://github.com/Toccata-Lang/ast.git"
                             "ast.toc"
-                            :sha "f4d55f3"))
+                            :sha "e9141ca"))
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
@@ -101,7 +101,7 @@
 
 (def symbol-punct
   (grmr/rule "symbol-punct"
-               (grmr/one-of "._<>=+-*?")))
+               (grmr/one-of "._<>=+-*?!")))
 
 (def symbol-char
   (grmr/rule "symbol-char"
@@ -256,24 +256,31 @@
 
 (def read-string-literal
   (grmr/rule "string"
-             (apply-to (fn [file-name line-num frags]
-                         (let [str-val (to-str frags)]
-                           (ast/string-ast str-val (c/Location file-name line-num)
-                                           ""
-                                           (.static c/strbuff-constraint str-val))))
-                       (grmr/ignore "\"")
-                       (grmr/get-value 'file-name)
-                       (grmr/get-value 'line-number)
-                       (grmr/none-or-more
-                        (grmr/any read-string-fragment
-                                  read-string-backslash
-                                  read-string-doublequote
-                                  read-string-tab
-                                  read-string-backspace
-                                  read-string-return
-                                  read-string-formfeed
-                                  read-string-newline))
-                       (grmr/ignore "\""))))
+             (grmr/any (apply-to (fn [file-name line-num frags]
+                                   (let [str-val (to-str frags)]
+                                     (ast/string-ast str-val (c/Location file-name line-num)
+                                                     ""
+                                                     (.static c/strbuff-constraint str-val))))
+                                 (grmr/ignore "\"")
+                                 (grmr/get-value 'file-name)
+                                 (grmr/get-value 'line-number)
+                                 (grmr/none-or-more
+                                  (grmr/any read-string-fragment
+                                            read-string-backslash
+                                            read-string-doublequote
+                                            read-string-tab
+                                            read-string-backspace
+                                            read-string-return
+                                            read-string-formfeed
+                                            read-string-newline))
+                                 (grmr/ignore "\""))
+                       (apply-to (fn [tagged-sym]
+                                   (let [str-val (str tagged-sym)]
+                                     (ast/string-ast str-val (ast/location tagged-sym)
+                                                     ""
+                                                     (.static c/strbuff-constraint str-val))))
+                                 (grmr/ignore "'")
+                                 read-symbol))))
 
 (def read-integer
   (grmr/rule "number"
@@ -921,6 +928,22 @@
                      (grmr/get-value 'file-name)
                      (grmr/get-value 'line-number))))
 
+(def read-super
+  (grmr/rule "superposition"
+             (apply-to identity
+                       (grmr/ignore "(|")
+                       (apply-to (fn [fn ln elems]
+                                   (ast/superposition-ast elems (c/Location fn ln)
+                                                          ""
+                                                          (c/SumConstraint (map elems .constraint)
+                                                                           (list (c/Location fn ln))
+                                                                           c/no-symbol)))
+                                 (grmr/get-value 'file-name)
+                                 (grmr/get-value 'line-number)
+                                 (grmr/none-or-more read-sub-expr)
+                                 (grmr/any (grmr/ignore (grmr/all ignore-whitespace "|)"))
+                                           (grmr/error "Missing \"|)\"."))))))
+
 (def read-vector
   (grmr/rule "vector"
              (apply-to identity
@@ -1223,6 +1246,7 @@
                        ignore-whitespace
                        (grmr/any read-integer-literal
                                  read-string-literal
+                                 read-super
                                  curr-file-name
                                  curr-line
                                  read-symbol
