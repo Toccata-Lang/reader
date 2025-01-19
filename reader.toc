@@ -783,14 +783,12 @@
                                        (c/update-sym sym)))
                                  ignore-whitespace
                                  (grmr/ignore "!")
-                                 (grmr/ignore (grmr/any " " read-string-tab))
-                                 ignore-whitespace
+                                 (grmr/ignore (grmr/one-or-more linear-whitespace))
                                  read-symbol
-                                 ignore-whitespace
+                                 (grmr/ignore (grmr/one-or-more linear-whitespace))
                                  (grmr/any read-type-expr
                                            (grmr/error "Missing type assertion in 'assert-result' expression."))
-                                 (grmr/ignore (grmr/none-or-more not-eol))
-                                 (grmr/ignore newline)))))
+                                 ignore-whitespace))))
 
 (def read-assert-result
   (grmr/rule "assert-result"
@@ -811,11 +809,10 @@
                                    (c/update-sym c ast/result-sym))
                                  ignore-whitespace
                                  (grmr/ignore "!returns")
-                                 ignore-whitespace
+                                 (grmr/ignore (grmr/one-or-more linear-whitespace))
                                  (grmr/any read-type-expr
                                            (grmr/error "Missing type assertion in 'assert-result' expression."))
-                                 (grmr/ignore (grmr/none-or-more not-eol))
-                                 (grmr/ignore newline)))))
+                                 ignore-whitespace))))
 
 (def read-inline
   (grmr/rule "read-inline"
@@ -1384,9 +1381,14 @@
                                                                  "type name."))
                                            (grmr/one-or-more
                                             (apply-to identity
-                                                      read-open-paren
-                                                      read-type-const
-                                                      read-close-paren)))
+                                                      ignore-whitespace
+                                                      (grmr/any (apply-to identity
+                                                                          read-open-paren
+                                                                          read-type-const
+                                                                          read-close-paren)
+                                                                read-symbol
+                                                                read-integer-literal
+                                                                read-string-literal))))
                                  read-type-const
                                  (grmr/error "Invalid 'deftype' expression."))
                        read-close-paren)))
