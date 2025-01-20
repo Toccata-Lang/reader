@@ -11,7 +11,7 @@
 ;; The different types of nodes in the AST
 (add-ns ast (git-dependency "https://github.com/Toccata-Lang/ast.git"
                             "ast.toc"
-                            :sha "9ac8420"))
+                            :sha "3a9027e"))
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
@@ -172,7 +172,6 @@
                        ignore-whitespace
                        (grmr/ignore "[")
                        (grmr/none-or-more read-sub-dest)
-                       read-var-arg
                        read-close-bracket)))
 
 (def read-destructure
@@ -816,7 +815,6 @@
                                  ignore-whitespace
                                  (grmr/ignore "[")
                                  (grmr/one-or-more read-sub-dest)
-                                 read-var-arg
                                  read-close-bracket)
                        read-fn-doc
                        (grmr/any read-inline-body
@@ -1351,7 +1349,6 @@
 ;;                     "c/no-string" c/no-string
 ;;                     "c/no-fields" c/no-fields
 ;;                     "c/no-args" c/no-args
-;;                     "c/variadic" c/variadic
 ;;                     "c/top-type" c/top-type
 ;;                     "c/bottom-type" c/bottom-type
 ;;                     "c/fn-constraint" c/fn-constraint
