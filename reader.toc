@@ -11,11 +11,11 @@
 ;; The different types of nodes in the AST
 (add-ns ast (git-dependency "https://github.com/Toccata-Lang/ast.git"
                             "ast.toc"
-                            :sha "97042bd"))
+                            :sha "9ac8420"))
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
-                          :sha "3688c6a"))
+                          :sha "1ddb196"))
 
 (def lflf "\n\n")
 
@@ -316,7 +316,7 @@
 
 (defn assert-min-count [file-name line-number len]
   ;; TODO: what was I thinking doing it this way. (Actually, I know.)
-  (-> (c/seq-c (repeat len c/top-type) c/coll-of-any)
+  (-> (c/vect-c (repeat len c/top-type) c/coll-of-any)
       (c/update-path (c/Location file-name line-number))))
 
 ;; TODO: might be useful to have a max count
@@ -559,8 +559,6 @@
    "agent-of" (fn [contents]
                 (c/intersect c/agent-constraint
                              (c/CollectionOf contents empty-list c/no-symbol)))
-   "sequence-of" (fn [contents]
-                   (c/seq-c [] (c/coll-of-c contents)))
    ;; "function-returns" (fn [contents]
    ;;                      (c/intersect c/fn-arity
    ;;                                   (c/CollectionOf contents empty-list c/no-symbol)))
@@ -608,58 +606,6 @@
                                  read-symbol)
                        read-close-paren)))
 
-(def read-seq-items
-  (grmr/rule "seq-items"
-             (apply-to identity
-                       ignore-whitespace
-                       (grmr/ignore "[")
-                       (grmr/one-or-more read-sub-type)
-                       read-close-bracket)))
-
-;; seq-of specifies the kinds of items in the seq
-(def read-seq-of
-  (grmr/rule "seq-of"
-             (apply-to (fn [file line [seq-type] item-types tail-type]
-                         (-> (c/seq-c item-types tail-type)
-                             (c/set-seq-type seq-type)
-                             (c/update-path (c/Location file line))))
-                       read-open-paren
-                       ignore-whitespace
-                       (grmr/get-value 'file-name)
-                       (grmr/get-value 'line-number)
-                       (grmr/any (grmr/all (grmr/ignore "list-of")
-                                           (grmr/always c/ListType))
-                                 (grmr/all (grmr/ignore "vector-of")
-                                           (grmr/always c/VectorType)))
-                       (grmr/optional read-seq-items [])
-                       (grmr/optional (apply-to (fn [c]
-                                                  (c/CollectionOf c empty-list c/no-symbol))
-                                                read-sub-type)
-                                      c/no-tail)
-                       read-close-paren)))
-
-;; seq-as specifies the specific items and the exact tail constraint
-(def read-seq-as
-  (grmr/rule "seq-as"
-             (apply-to (fn [file line [seq-type] items-types tail-type]
-                         (-> (c/seq-c items-types tail-type)
-                             (c/set-seq-type seq-type)
-                             (c/update-path (c/Location file line))))
-                       read-open-paren
-                       ignore-whitespace
-                       (grmr/get-value 'file-name)
-                       (grmr/get-value 'line-number)
-                       (grmr/any (grmr/all (grmr/ignore "list-as")
-                                           (grmr/always c/ListType))
-                                 (grmr/all (grmr/ignore "vector-as")
-                                           (grmr/always c/VectorType)))
-                       (apply-to identity
-                                 read-open-bracket
-                                 (grmr/none-or-more read-sub-type)
-                                 read-close-bracket)
-                       (grmr/optional read-sub-type c/no-tail)
-                       read-close-paren)))
-
 (def read-concat-type
   (grmr/rule "concat"
              (apply-to (fn [file line c]
@@ -675,14 +621,11 @@
                        (grmr/any (apply-to (fn [sym]
                                              (c/TypeOfConstraint sym empty-list c/no-symbol))
                                            read-symbol)
-                                 read-seq-as
-                                 read-seq-of
                                  (grmr/error "Invalid type expression"))
                        read-close-paren)))
 
 (def seq-assertions
   {"vector-from" c/vect-from-op
-   "list-from" c/list-from-op
    "rest-of" c/rest-of-op
    "butlast-of" c/butlast-of-op
    "first-of" c/first-of-op
@@ -729,8 +672,6 @@
              (grmr/any read-sum-type
                        read-multi-type
                        read-map-assertion
-                       read-seq-of
-                       read-seq-as
                        read-generic-type
                        read-type-of-arg-type
                        read-concat-type
@@ -1319,8 +1260,6 @@
                                                                 (grmr/any read-sum-type
                                                                           read-multi-type
                                                                           read-map-assertion
-                                                                          read-seq-of
-                                                                          read-seq-as
                                                                           read-generic-type
                                                                           read-type-of-arg-type
                                                                           read-concat-type
@@ -1405,9 +1344,7 @@
 ;; (def type-literals {"empty-list" empty-list
 ;;                     "c/empty-list-constraint" c/empty-list-constraint
 ;;                     "c/empty-vect-constraint" c/empty-vect-constraint
-;;                     "c/list-constraint" c/list-constraint
 ;;                     "c/vect-constraint" c/vect-constraint
-;;                     "c/seq-constraint" c/seq-constraint
 ;;                     "c/no-symbol" c/no-symbol
 ;;                     "c/no-tail" c/no-tail
 ;;                     "c/no-int" c/no-int
@@ -1461,9 +1398,7 @@
 ;;                        "c/FnConstraint" c/FnConstraint
 ;;                        "c/fn-c " c/fn-c
 ;;                        "c/fn-arity" c/fn-arity
-;;                        "c/seq-c" c/seq-c
 ;;                        "c/vec-c" c/vect-c
-;;                        "c/list-c " c/list-c
 ;;                        "c/param " c/param
 ;;                        "c/tag" c/tag
 ;;                        "c/ParamConstraint" c/ParamConstraint
