@@ -11,7 +11,7 @@
 ;; The different types of nodes in the AST
 (add-ns ast (git-dependency "https://github.com/Toccata-Lang/ast.git"
                             "ast.toc"
-                            :sha "c2ee5b2"))
+                            :sha "a7c7ac3"))
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
@@ -870,7 +870,7 @@
                        (grmr/ignore "(|")
                        (apply-to (fn [fn ln elems]
                                    (ast/superposition-ast elems (c/Location fn ln)
-                                                          ""
+                                                          0 ""
                                                           (c/SumConstraint (map elems .constraint)
                                                                            (list (c/Location fn ln))
                                                                            c/no-symbol)))
@@ -885,8 +885,11 @@
              (apply-to identity
                        (grmr/ignore "[")
                        (apply-to (fn [fn ln elems]
-                                   (ast/call-expr (cons (c/tag 'vector (c/Location fn ln))
-                                                        (seq elems))))
+                                   (let [loc (c/Location fn ln)]
+                                     (reduce elems (c/tag 'empty-vector loc)
+                                             (fn [vect v]
+                                               (ast/call-expr (list (c/tag 'vect-conj loc)
+                                                                    vect v))))))
                                  (grmr/get-value 'file-name)
                                  (grmr/get-value 'line-number)
                                  (grmr/none-or-more read-sub-expr)
