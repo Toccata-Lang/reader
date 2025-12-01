@@ -11,7 +11,7 @@
 ;; The different types of nodes in the AST
 (add-ns ast (git-dependency "https://github.com/Toccata-Lang/ast.git"
                             "ast.toc"
-                            :sha "bea6a0d"))
+                            :sha "556a8de"))
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
@@ -761,7 +761,7 @@
                        (grmr/ignore "inline")
                        (grmr/ignore (grmr/one-or-more whitespace))
                        (grmr/any (apply-to (fn [file-name line-number return-type body]
-                                             (ast/inline-ast return-type body
+                                             (ast/inline-ast return-type "" body
                                                              (c/Location file-name line-number) ""))
                                            (grmr/get-value 'file-name)
                                            (grmr/get-value 'line-number)
