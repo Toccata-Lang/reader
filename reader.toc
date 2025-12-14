@@ -922,6 +922,26 @@
                                  (grmr/any (grmr/ignore "}")
                                            (grmr/error "Missing \"}\"."))))))
 
+(def read-println
+  (grmr/rule "println"
+             (apply-to identity
+                       read-open-paren
+                       ignore-whitespace
+                       (grmr/ignore "println")
+                       (grmr/ignore (grmr/one-or-more whitespace))
+                       (apply-to (fn [fn ln elems]
+                                   (let [loc (c/Location fn ln)
+                                         arg-vect (reduce elems (c/tag 'empty-vector loc)
+                                                          (fn [vect v]
+                                                            (ast/call-expr (list (c/tag 'vect-conj loc)
+                                                                                 vect v))))]
+                                     (ast/call-expr (list (c/tag 'println* loc)
+                                                          arg-vect))))
+                                 (grmr/get-value 'file-name)
+                                 (grmr/get-value 'line-number)
+                                 (grmr/none-or-more read-sub-expr)
+                                 read-close-paren))))
+
 (defn nest-thread-exprs [first-expr exprs]
   (let [[first-expr & exprs] (remove (cons first-expr (seq exprs))
                                      (partial instance? ast/NoCode))]
@@ -1200,6 +1220,7 @@
                                  read-hash-set
                                  ;; read-for
                                  read-threading
+                                 read-println
                                  read-assert
                                  read-assert-result
                                  (grmr/all read-inline
