@@ -922,6 +922,59 @@
                                  (grmr/any (grmr/ignore "}")
                                            (grmr/error "Missing \"}\"."))))))
 
+(def read-cond
+  (grmr/rule "cond"
+             (apply-to identity
+                       read-open-paren
+                       ignore-whitespace
+                       (grmr/ignore "cond")
+                       (grmr/ignore (grmr/one-or-more whitespace))
+                       (grmr/any (apply-to (fn [fn ln exprs]
+                                             (let [loc (c/Location fn ln)
+                                                   exprs (reverse exprs)
+                                                   false-expr (either (first exprs)
+                                                                      (do
+                                                                        (print-err "Reader error"
+                                                                                   _LINE_)
+                                                                        (abort)))]
+                                               (reduce (rest exprs) false-expr
+                                                       (fn [false-expr [cond-true]]
+                                                         (print-err 'cond-true cond-true)
+                                                         (let [[cond-expr true-expr]
+                                                               (either (maybe cond-true)
+                                                                       [])]
+                                                           (ast/call-expr (list (c/tag 'cond loc)
+                                                                                cond-expr true-expr
+                                                                                false-expr)))))))
+                                           (grmr/get-value 'file-name)
+                                           (grmr/get-value 'line-number)
+                                           (grmr/all (grmr/one-or-more (grmr/all read-sub-expr
+                                                                                 read-sub-expr))
+                                                     read-sub-expr)
+                                           read-close-paren)
+                                 (grmr/error "malformed 'cond' expression")))))
+
+;; some macros
+(def read-str
+  (grmr/rule "str"
+             (apply-to identity
+                       read-open-paren
+                       ignore-whitespace
+                       (grmr/ignore "str")
+                       (grmr/ignore (grmr/one-or-more whitespace))
+                       (apply-to (fn [fn ln elems]
+                                   (let [loc (c/Location fn ln)
+                                         arg-vect (reduce elems (c/tag 'empty-vector loc)
+                                                          (fn [vect v]
+                                                            (ast/call-expr (list (c/tag 'vect-conj loc)
+                                                                                 vect v))))]
+                                     (ast/call-expr (list (c/tag 'str* loc)
+                                                          arg-vect))))
+                                 (grmr/get-value 'file-name)
+                                 (grmr/get-value 'line-number)
+                                 (grmr/none-or-more read-sub-expr)
+                                 read-close-paren))))
+
 (def read-println
   (grmr/rule "println"
              (apply-to identity
@@ -1214,6 +1267,7 @@
                                  read-fn
                                  read-let
                                  read-do
+                                 read-cond
                                  ;; read-apply-to
                                  read-vector
                                  read-hash-map
@@ -1221,6 +1275,7 @@
                                  ;; read-for
                                  read-threading
                                  read-println
+                                 read-str
                                  read-assert
                                  read-assert-result
                                  (grmr/all read-inline
