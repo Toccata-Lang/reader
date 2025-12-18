@@ -939,7 +939,6 @@
                                                                         (abort)))]
                                                (reduce (rest exprs) false-expr
                                                        (fn [false-expr [cond-true]]
-                                                         (print-err 'cond-true cond-true)
                                                          (let [[cond-expr true-expr]
                                                                (either (maybe cond-true)
                                                                        [])]
