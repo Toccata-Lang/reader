@@ -931,20 +931,12 @@
                        (grmr/ignore (grmr/one-or-more whitespace))
                        (grmr/any (apply-to (fn [fn ln exprs]
                                              (let [loc (c/Location fn ln)
-                                                   exprs (reverse exprs)
-                                                   false-expr (either (first exprs)
-                                                                      (do
-                                                                        (print-err "Reader error"
-                                                                                   _LINE_)
-                                                                        (abort)))]
-                                               (reduce (rest exprs) false-expr
-                                                       (fn [false-expr [cond-true]]
-                                                         (let [[cond-expr true-expr]
-                                                               (either (maybe cond-true)
-                                                                       [])]
-                                                           (ast/call-expr (list (c/tag 'cond loc)
-                                                                                cond-expr true-expr
-                                                                                false-expr)))))))
+                                                   [clauses false-expr] exprs]
+                                               (reduce (reverse clauses) false-expr
+                                                       (fn [false-expr [cond-expr true-expr]]
+                                                         (ast/call-expr (list (c/tag 'cond loc)
+                                                                              cond-expr true-expr
+                                                                              false-expr))))))
                                            (grmr/get-value 'file-name)
                                            (grmr/get-value 'line-number)
                                            (grmr/all (grmr/one-or-more (grmr/all read-sub-expr
