@@ -1606,6 +1606,43 @@
                                            read-close-paren)
                                  (grmr/error "'main' fn expression is wrong.")))))
 
+(def read-module
+  (grmr/rule "module"
+             (apply-to ast/annotated
+                       read-open-paren
+                       (grmr/ignore "module")
+                       (grmr/ignore (grmr/one-or-more whitespace))
+                       (grmr/any (apply-to (fn [file-name line-number file-path]
+                                             (ast/module-ast file-path
+                                                             (c/Location file-name line-number)
+                                                             "" c/top-type))
+                                           (grmr/get-value 'file-name)
+                                           (grmr/get-value 'line-number)
+                                           read-string-literal
+                                           read-close-paren)
+                                 (grmr/error "'add-ns fn expression is wrong.")))))
+
+(def read-add-ns
+  (grmr/rule "add-ns"
+             (apply-to ast/annotated
+                       read-open-paren
+                       (grmr/ignore "add-ns")
+                       (grmr/ignore (grmr/one-or-more whitespace))
+                       (grmr/any (apply-to (fn [file-name line-number sym module]
+                                             (ast/add-ns-ast sym module {}
+                                                             (c/Location file-name line-number)
+                                                             "" c/top-type))
+                                           (grmr/get-value 'file-name)
+                                           (grmr/get-value 'line-number)
+                                           (apply-to (fn [start the-rest]
+                                                       (symbol (to-str (comp [start] the-rest))))
+                                                     grmr/alpha
+                                                     rest-of-namespace)
+                                           (grmr/ignore (grmr/one-or-more whitespace))
+                                           read-module
+                                           read-close-paren)
+                                 (grmr/error "'add-ns fn expression is wrong.")))))
+
 (def top-level
   (grmr/rule "top-level"
              (apply-to identity
@@ -1620,7 +1657,7 @@
                                  read-main
                                  ;; read-JS-callable
                                  read-inline
-                                 ;; read-add-ns
+                                 read-add-ns
 
                                  ;; ;; for core-types.toc
                                  ;; read-show-type
