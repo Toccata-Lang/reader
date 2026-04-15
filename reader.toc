@@ -87,13 +87,21 @@
 
 (def read-open-bracket
   (grmr/rule "open-bracket"
-             (grmr/any (grmr/ignore (grmr/all ignore-whitespace "["))
-                       (grmr/error "Missing \"[\"."))))
+             (grmr/ignore (grmr/all ignore-whitespace "["))))
 
 (def read-close-bracket
   (grmr/rule "close-bracket"
              (grmr/any (grmr/ignore (grmr/all ignore-whitespace "]"))
                        (grmr/error "Missing \"]\"."))))
+
+(def read-open-brace
+  (grmr/rule "open-bracket"
+             (grmr/ignore (grmr/all ignore-whitespace "["))))
+
+(def read-close-brace
+  (grmr/rule "close-bracket"
+             (grmr/any (grmr/ignore (grmr/all ignore-whitespace "]"))
+                       (grmr/error "Missing \"}\"."))))
 
 (def symbol-start
   (grmr/rule "symbol-start"
@@ -490,10 +498,28 @@
 ;;                        (grmr/one-or-more read-integer)
 ;;                        read-close-paren)))
 
+(defn assert-vector-of [contents-type]
+  (assert (instance? c/ValueConstraint contents-type))
+
+  ;; TODO: finish after new vector constraint is created
+  (-> c/vect-constraint
+      (c/update-path (ast/location contents-type))))
+
+(def read-vector-assertion
+  (grmr/rule "assert-vector-of"
+             (apply-to assert-vector-of
+                       read-open-bracket
+                       ignore-whitespace
+                       (grmr/any read-sub-type
+                                 (grmr/error "The 'map-of' expression must contain one type expression"
+                                             "for the key values and one for the mapped values."))
+                       read-close-bracket)))
+
 (defn assert-map-of [key-type val-type]
   (assert (instance? c/ValueConstraint key-type))
   (assert (instance? c/ValueConstraint val-type))
 
+  ;; TODO: save the key and val types
   (-> ;; (cata (fn [c]
       ;;         (cond (instance? c/HashMapConstraint c)
       ;;               (-> c
@@ -506,17 +532,28 @@
 
 (def read-map-assertion
   (grmr/rule "assert-map-of"
-             (apply-to assert-map-of
-                       read-open-paren
-                       ignore-whitespace
-                       (grmr/ignore "map-of")
-                       (grmr/ignore (grmr/one-or-more whitespace))
-                       read-sub-type
-                       (grmr/ignore (grmr/one-or-more whitespace))
-                       (grmr/any read-sub-type
-                                 (grmr/error "The 'map-of' expression must contain one type expression"
-                                             "for the key values and one for the mapped values."))
-                       read-close-paren)))
+             (grmr/any
+              (apply-to assert-map-of
+                        read-open-paren
+                        ignore-whitespace
+                        (grmr/ignore "map-of")
+                        (grmr/ignore (grmr/one-or-more whitespace))
+                        read-sub-type
+                        (grmr/ignore (grmr/one-or-more whitespace))
+                        (grmr/any read-sub-type
+                                  (grmr/error "The 'map-of' expression must contain one type expression"
+                                              "for the key values and one for the mapped values."))
+                        read-close-paren)
+              ;; (apply-to assert-map-of
+              ;;           read-open-brace
+              ;;           ignore-whitespace
+              ;;           read-sub-type
+              ;;           (grmr/ignore (grmr/one-or-more whitespace))
+              ;;           (grmr/any read-sub-type
+              ;;                     (grmr/error "The 'map-of' expression must contain one type expression"
+              ;;                                 "for the key values and one for the mapped values."))
+              ;;           read-close-brace)
+              )))
 
 (def read-multi-type
   (grmr/rule "multi-type"
@@ -605,6 +642,24 @@
                                  read-symbol)
                        read-close-paren)))
 
+(def read-type-of-fn
+  (grmr/rule "fn-type"
+             (apply-to (fn [file line arg-types result-type]
+                         ;; TODO: create a function type constraint
+                         ;; (-> (c/type-op c/apply-op c arg-cs)
+                         ;;     (c/update-path (c/Location file line)))
+                         c/top-type
+                         )
+                       read-open-paren
+                       (grmr/ignore "->")
+                       (grmr/get-value 'file-name)
+                       (grmr/get-value 'line-number)
+                       read-open-bracket
+                       (grmr/none-or-more read-sub-type)
+                       read-close-bracket
+                       read-sub-type
+                       read-close-paren)))
+
 (def read-concat-type
   (grmr/rule "concat"
              (apply-to (fn [file line c]
@@ -659,6 +714,13 @@
                (.type-symbol c/empty-reified type-sym))
       (c/update-path (ast/location type-sym))))
 
+(def read-any-type
+  (grmr/rule "any-type"
+             (apply-to (fn [_]
+                         c/top-type)
+                       ignore-whitespace
+                       "_")))
+
 (def read-singleton-type
   (grmr/rule "singleton"
              (apply-to identity
@@ -670,6 +732,7 @@
   (grmr/rule read-sub-type
              (grmr/any read-sum-type
                        read-multi-type
+                       read-vector-assertion
                        read-map-assertion
                        read-generic-type
                        read-type-of-arg-type
@@ -677,6 +740,7 @@
                        read-type-of-result-type
                        read-type-of-fn-call
                        read-type-of-fn-apply
+                       read-type-of-fn
                        ;; read-required-arities
                        read-type-of-type
                        read-min-count-assertion
@@ -685,6 +749,7 @@
                        read-inner-type-of-type
                        read-seq-type
                        read-singleton-type
+                       read-any-type
                        (apply-to assert-type
                                  ignore-whitespace
                                  read-symbol))))
@@ -716,7 +781,8 @@
                                            (grmr/error "Missing type assertion in 'assert' expression."))
                                  read-close-paren)
                        (apply-to (fn [sym c]
-                                   (assert (instance? c/SymbolConstraints c))
+                                   ;; TODO: put back in
+                                   ;; (assert (instance? c/SymbolConstraints c))
 
                                    (-> c
                                        (c/update-path (ast/location sym))
@@ -727,7 +793,7 @@
                                  read-symbol
                                  (grmr/ignore (grmr/one-or-more linear-whitespace))
                                  (grmr/any read-type-expr
-                                           (grmr/error "Missing type assertion in 'assert-result' expression."))
+                                           (grmr/error "Missing type assertion in type constraint expression."))
                                  ignore-whitespace))))
 
 (def read-assert-result
@@ -877,8 +943,7 @@
                                  (grmr/get-value 'file-name)
                                  (grmr/get-value 'line-number)
                                  (grmr/none-or-more read-sub-expr)
-                                 (grmr/any (grmr/ignore (grmr/all ignore-whitespace "|)"))
-                                           (grmr/error "Missing \"|)\"."))))))
+				 read-close-paren))))
 
 (def read-vector
   (grmr/rule "vector"
