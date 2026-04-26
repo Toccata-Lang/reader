@@ -947,18 +947,26 @@
 
 (def read-vector
   (grmr/rule "vector"
-             (apply-to identity
-                       (grmr/ignore "[")
-                       (apply-to (fn [fn ln elems]
-                                   (let [loc (c/Location fn ln)]
-                                     (reduce elems (c/tag 'empty-vector loc)
-                                             (fn [vect v]
-                                               (ast/call-expr (list (c/tag 'vect-conj loc)
-                                                                    vect v))))))
-                                 (grmr/get-value 'file-name)
-                                 (grmr/get-value 'line-number)
-                                 (grmr/none-or-more read-sub-expr)
-                                 read-close-bracket))))
+             (apply-to (fn [[fn ln elems]]
+                         (let [loc (c/Location fn ln)]
+                           (reduce elems (c/tag 'empty-vector loc)
+                                   (fn [vect v]
+                                     (ast/call-expr (list (c/tag 'vect-conj loc)
+                                                          vect v))))))
+                       (grmr/any
+                        (grmr/all
+                         read-open-bracket
+                         (grmr/get-value 'file-name)
+                         (grmr/get-value 'line-number)
+                         (grmr/none-or-more read-sub-expr)
+                         read-close-bracket)
+                        (grmr/all
+                         read-open-paren
+                         (grmr/ignore "vector")
+                         (grmr/get-value 'file-name)
+                         (grmr/get-value 'line-number)
+                         (grmr/none-or-more read-sub-expr)
+                         read-close-paren)))))
 
 (def read-hash-map
   (grmr/rule "hash-map"
