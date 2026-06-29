@@ -15,7 +15,7 @@
 
 (add-ns c (git-dependency "https://github.com/Toccata-Lang/constraints.git"
                           "constraints.toc"
-                          :sha "80258a3"))
+                          :sha "2f1dce1"))
 
 (def lflf "\n\n")
 
@@ -973,8 +973,9 @@
              (apply-to identity
                        (grmr/ignore "{")
                        (apply-to (fn [fn ln elems]
-                                   (ast/call-expr (cons (c/tag 'hash-map (c/Location fn ln))
-                                                        (comp* empty-list elems))))
+                                   (reduce elems (c/tag 'emptyBMI (c/Location fn ln))
+                                           (fn [m [k v]]
+                                             (ast/call-expr (list (c/tag 'assoc (c/Location fn ln)) m k v)))))
                                  (grmr/get-value 'file-name)
                                  (grmr/get-value 'line-number)
                                  (grmr/none-or-more (grmr/all read-sub-expr
